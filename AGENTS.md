@@ -55,7 +55,7 @@ These files are from: https://github.com/ICantMakeThings/Nicenano-NRF52-Supermin
 ### Build
 
 ```
-cd experiments\Exp01\firmware
+cd firmware
 .\build.ps1                # builds + converts to UF2
 ```
 
