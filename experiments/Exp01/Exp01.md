@@ -12,7 +12,7 @@ The PlatformIO toolchain + WSL build + UF2 flashing pipeline works with our nice
 
 ## Success Criteria
 - [x] Build succeeds producing a valid `.uf2`
-- [ ] After flashing, board blinks 2 quick pulses repeatedly (200ms ON, 200ms OFF, 200ms ON, 2s pause)
+- [x] After flashing, board blinks 2 quick pulses repeatedly (200ms ON, 200ms OFF, 200ms ON, 2s pause)
 
 ## Challenges
 - Alpine WSL uses musl libc — ARM cross-compiler toolchain is glibc, incompatible

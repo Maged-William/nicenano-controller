@@ -38,9 +38,38 @@ https://github.com/ICantMakeThings/Nicenano-NRF52-Supermini-PlatformIO-Support
 
 # Building & Flashing
 
-Use WSL to build the .uf2, save it here `/mnt/d/DIY/controller/ideation/collection`
+## Build (Windows)
 
-I'll double tap the RST with GND to enter the bootloader and copy the files.
+The ARM toolchain requires glibc — Alpine WSL (musl) is incompatible. Build on Windows directly.
+
+### Prerequisites (one-time)
+
+PlatformIO must have the nicenano board definition and variant files:
+
+1. Install PlatformIO: `pip install platformio`
+2. Copy `nicenano.json` to `%USERPROFILE%\.platformio\platforms\nordicnrf52\boards\`
+3. Copy `variant.h` and `variant.cpp` to `%USERPROFILE%\.platformio\packages\framework-arduinoadafruitnrf52\variants\nicenano\`
+
+These files are from: https://github.com/ICantMakeThings/Nicenano-NRF52-Supermini-PlatformIO-Support
+
+### Build
+
+```
+cd experiments\Exp01\firmware
+.\build.ps1                # builds + converts to UF2
+```
+
+Or manually:
+```
+pio run
+python uf2conv.py .pio\build\nicenano\firmware.hex -c -f 0xADA52840
+```
+
+The `.uf2` is saved to the project root.
+
+## Flashing
+
+Double-tap RST with GND to enter bootloader, then copy `firmware.uf2` to the `NICENANO` drive (`G:/`).
 
 > side quest: Invest in making this autonomous
 
