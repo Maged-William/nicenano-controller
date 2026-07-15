@@ -1,0 +1,4 @@
+.pio/
+experiments/*/firmware/.pio/
+experiments/*/firmware/firmware.uf2
+firmware.uf2
