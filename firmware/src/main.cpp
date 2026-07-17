@@ -92,7 +92,33 @@ void setup() {
 int16_t ax1, ay1, az1, gx1, gy1, gz1;
 int16_t ax2, ay2, az2, gx2, gy2, gz2;
 
+static void checkSerialCommand() {
+  if (!Serial.available()) return;
+
+  static char buf[32];
+  static uint8_t i = 0;
+
+  while (Serial.available()) {
+    char c = Serial.read();
+    if (c == '\n' || i >= sizeof(buf) - 1) {
+      buf[i] = '\0';
+      i = 0;
+
+      if (strcmp(buf, "BOOTLOADER") == 0) {
+        Serial.println("OK_RESET");
+        Serial.flush();
+        delay(20);
+        enterSerialDfu();
+      }
+    } else if (c != '\r') {
+      buf[i++] = c;
+    }
+  }
+}
+
 void loop() {
+  checkSerialCommand();
+
   readBMI160(CS1, &ax1, &ay1, &az1, &gx1, &gy1, &gz1);
   readBMI160(CS2, &ax2, &ay2, &az2, &gx2, &gy2, &gz2);
 
