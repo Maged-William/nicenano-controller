@@ -425,8 +425,9 @@ int main(void)
 			int16_t ch1 = adc_read_channel(1);
 			int16_t ch2 = adc_read_channel(2);
 			int16_t ch3 = adc_read_channel(3);
-			printk("%d\t%.0f\t%.0f\t%.0f\t%d\t%d\t%d\t%d\n",
-			       tick_count, fx, fy, fz, ch0, ch1, ch2, ch3);
+			printk("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
+			       tick_count, (int)fx, (int)fy, (int)fz,
+			       ch0, ch1, ch2, ch3);
 		}
 
 		if (tick_count % LED_DECIMATION == 0) {
