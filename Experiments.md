@@ -11,3 +11,4 @@
 | Exp07 | ✅ Complete | USB HID Mouse — synthetic rectangle motion (100×100) via Zephyr, CDC ACM + HID composite |
 | Exp08 | ✅ Complete | ADS1015 joystick reading via I2C — port from PlatformIO to Zephyr RTOS |
 | Exp09 | ✅ Complete | BMI160 gyro + accel over SPI — port from PlatformIO to Zephyr RTOS |
+| Exp10 | 🏗️ In Progress | Dual-gyro HID mouse via saturation-weighted crossfade — Alpakka-style fusion of 2 BMI160s at ±125°/s & ±500°/s with burst averaging |

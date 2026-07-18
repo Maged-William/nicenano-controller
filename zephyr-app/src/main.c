@@ -1,19 +1,111 @@
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/usb/usb_device.h>
+#include <zephyr/usb/class/usb_hid.h>
 #include <zephyr/drivers/uart.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/i2c.h>
 #include <zephyr/drivers/spi.h>
 #include <zephyr/device.h>
 #include <stdbool.h>
+#include <stdint.h>
 
-/* === ADS1015 ADC (I2C) === */
-#define ADC_ADDR    0x48
-#define CONV_REG    0x00
-#define CONFIG_REG  0x01
+/* ================================================================
+ * Constants
+ * ================================================================ */
+
+/* --- ADS1015 ADC (I2C) --- */
+#define ADC_ADDR        0x48
+#define CONV_REG        0x00
+#define CONFIG_REG      0x01
+
+/* --- BMI160 SPI --- */
+#define CS1_PIN         31   /* high-range sensor: gyro ±500°/s */
+#define CS2_PIN         29   /* low-range  sensor: gyro ±125°/s */
+
+#define BMI160_CHIPID      0x00
+#define BMI160_PMU_STATUS  0x03
+#define BMI160_DATA_8      0x0C
+#define BMI160_ACCEL_CONF  0x40
+#define BMI160_ACCEL_RANGE 0x41
+#define BMI160_GYRO_CONF   0x42
+#define BMI160_GYRO_RANGE  0x43
+#define BMI160_CMD         0x7E
+
+#define GYRO_RANGE_125  0x04
+#define GYRO_RANGE_500  0x02
+#define ACCEL_RANGE_2G  0x03
+#define ODR_1600HZ      0x0C
+
+/* --- Burst averaging --- */
+#define BURST_TOTAL  128
+#define BURST_HIGH   16
+#define BURST_LOW    112
+
+/* --- Loop timing: 250 Hz → 4 ms ticks --- */
+#define TICK_PERIOD_MS  4
+#define ADC_DECIMATION  25   /* read ADC every 25 ticks (10 Hz) */
+#define LED_DECIMATION  100  /* toggle LED every 100 ticks (2.5 Hz) */
+
+/* --- Sensitivity (empirical, will tune) --- */
+#define GYRO_SENS  0.001f
+
+/* --- HSSNF parameters --- */
+#define HSSNF_T  1.0f
+#define HSSNF_K  0.5f
+
+#define MOUSE_REPORT_SIZE  4
+
+/* ================================================================
+ * Global state
+ * ================================================================ */
 
 static const struct device *i2c_dev;
+static const struct device *spi_dev;
+static const struct device *hid_dev;
+static const struct device *gpio0;
+
+static const struct spi_config spi_cfg = {
+	.frequency = 8000000,
+	.operation = SPI_OP_MODE_MASTER | SPI_WORD_SET(8) | SPI_TRANSFER_MSB,
+	.slave = 0,
+};
+
+static float mouse_acc_x;
+static float mouse_acc_y;
+
+/* ================================================================
+ * Math helpers
+ * ================================================================ */
+
+static inline float fast_fabs(float x) { return x < 0.0f ? -x : x; }
+
+static float ramp_mid(float x, float z)
+{
+	if (x < z) return 0.0f;
+	if (x > (1.0f - z)) return 1.0f;
+	return (x - z) / (1.0f - 2.0f * z);
+}
+
+static float hssnf(float t, float k, float x)
+{
+	float a = x - (x * k);
+	float b = 1.0f - (x * k * (1.0f / t));
+	return a / b;
+}
+
+static float apply_hssnf(float x)
+{
+	if (x > 0.0f && x < HSSNF_T)
+		return hssnf(HSSNF_T, HSSNF_K, x);
+	if (x < 0.0f && x > -HSSNF_T)
+		return -hssnf(HSSNF_T, HSSNF_K, -x);
+	return x;
+}
+
+/* ================================================================
+ * ADS1015 ADC (I2C)
+ * ================================================================ */
 
 static int adc_write_reg(uint8_t reg, uint16_t val)
 {
@@ -34,11 +126,11 @@ static int adc_read_reg(uint8_t reg, uint16_t *val)
 static int16_t adc_read_channel(uint8_t ch)
 {
 	uint16_t cfg = (1 << 15)
-		     | ((0b100 | (ch & 3)) << 12)
-		     | (0b001 << 9)
-		     | (1 << 8)
-		     | (0b100 << 5)
-		     | 0b0000011;
+		| ((0b100 | (ch & 3)) << 12)
+		| (0b001 << 9)
+		| (1 << 8)
+		| (0b100 << 5)
+		| 0b0000011;
 
 	adc_write_reg(CONFIG_REG, cfg);
 
@@ -64,39 +156,22 @@ static int scan_adc(void)
 	return 0;
 }
 
-/* === BMI160 IMU (SPI) === */
-#define CS1_PIN 31
-#define CS2_PIN 29
+/* ================================================================
+ * BMI160 SPI
+ * ================================================================ */
 
-#define BMI160_CHIPID     0x00
-#define BMI160_PMU_STATUS 0x03
-#define BMI160_DATA_8     0x0C
-#define BMI160_ACCEL_CONF 0x41
-#define BMI160_GYRO_CONF  0x43
-#define BMI160_CMD        0x7E
-
-static const struct device *spi_dev;
-
-static const struct spi_config spi_cfg = {
-	.frequency = 1000000,
-	.operation = SPI_OP_MODE_MASTER | SPI_WORD_SET(8) | SPI_TRANSFER_MSB,
-	.slave = 0,
-};
-
-static void bmi160_write_reg(const struct device *gpio, gpio_pin_t cs,
-			     uint8_t reg, uint8_t val)
+static void bmi160_write_reg(gpio_pin_t cs, uint8_t reg, uint8_t val)
 {
 	uint8_t tx_data[2] = { reg & 0x7F, val };
 	const struct spi_buf tx_buf = { .buf = tx_data, .len = 2 };
 	const struct spi_buf_set tx = { .buffers = &tx_buf, .count = 1 };
 
-	gpio_pin_set(gpio, cs, 0);
+	gpio_pin_set(gpio0, cs, 0);
 	spi_write(spi_dev, &spi_cfg, &tx);
-	gpio_pin_set(gpio, cs, 1);
+	gpio_pin_set(gpio0, cs, 1);
 }
 
-static uint8_t bmi160_read_reg(const struct device *gpio, gpio_pin_t cs,
-			       uint8_t reg)
+static uint8_t bmi160_read_reg(gpio_pin_t cs, uint8_t reg)
 {
 	uint8_t tx_data[2] = { reg | 0x80, 0 };
 	uint8_t rx_data[2] = { 0 };
@@ -105,88 +180,189 @@ static uint8_t bmi160_read_reg(const struct device *gpio, gpio_pin_t cs,
 	const struct spi_buf_set tx = { .buffers = &tx_buf, .count = 1 };
 	const struct spi_buf_set rx = { .buffers = &rx_buf, .count = 1 };
 
-	gpio_pin_set(gpio, cs, 0);
+	gpio_pin_set(gpio0, cs, 0);
 	spi_transceive(spi_dev, &spi_cfg, &tx, &rx);
-	gpio_pin_set(gpio, cs, 1);
+	gpio_pin_set(gpio0, cs, 1);
 
 	return rx_data[1];
 }
 
-static bool bmi160_init(const struct device *gpio, gpio_pin_t cs)
+static bool bmi160_init(gpio_pin_t cs, uint8_t gyro_range)
 {
-	bmi160_write_reg(gpio, cs, BMI160_CMD, 0xB6);
+	bmi160_write_reg(cs, BMI160_CMD, 0xB6);
 	k_sleep(K_MSEC(10));
 
-	bmi160_read_reg(gpio, cs, 0x7F);
+	bmi160_read_reg(cs, 0x7F);
 	k_sleep(K_MSEC(10));
 
-	bmi160_write_reg(gpio, cs, BMI160_CMD, 0x11);
+	bmi160_write_reg(cs, BMI160_CMD, 0x11);
 	k_sleep(K_MSEC(5));
 	int timeout = 100;
-	while ((bmi160_read_reg(gpio, cs, BMI160_PMU_STATUS) & 0x30) != 0x10 && timeout--) {
+	while ((bmi160_read_reg(cs, BMI160_PMU_STATUS) & 0x30) != 0x10 && timeout--) {
 		k_sleep(K_MSEC(1));
 	}
 	if (timeout <= 0) return false;
 
-	bmi160_write_reg(gpio, cs, BMI160_CMD, 0x15);
+	bmi160_write_reg(cs, BMI160_CMD, 0x15);
 	k_sleep(K_MSEC(5));
 	timeout = 500;
-	while ((bmi160_read_reg(gpio, cs, BMI160_PMU_STATUS) & 0x0C) != 0x04 && timeout--) {
+	while ((bmi160_read_reg(cs, BMI160_PMU_STATUS) & 0x0C) != 0x04 && timeout--) {
 		k_sleep(K_MSEC(1));
 	}
 	if (timeout <= 0) return false;
 
-	bmi160_write_reg(gpio, cs, BMI160_ACCEL_CONF, 0x03);
-	bmi160_write_reg(gpio, cs, BMI160_GYRO_CONF, 0x03);
+	bmi160_write_reg(cs, BMI160_ACCEL_CONF, ODR_1600HZ);
+	bmi160_write_reg(cs, BMI160_GYRO_CONF, ODR_1600HZ);
+	bmi160_write_reg(cs, BMI160_ACCEL_RANGE, ACCEL_RANGE_2G);
+	bmi160_write_reg(cs, BMI160_GYRO_RANGE, gyro_range);
 
-	return bmi160_read_reg(gpio, cs, BMI160_CHIPID) == 0xD1;
+	return bmi160_read_reg(cs, BMI160_CHIPID) == 0xD1;
 }
 
-static void bmi160_read_data(const struct device *gpio, gpio_pin_t cs,
-			     int16_t *gx, int16_t *gy, int16_t *gz,
-			     int16_t *ax, int16_t *ay, int16_t *az)
+/* Read gyro X/Y/Z only (6 bytes, registers 0x0C–0x11) via burst */
+static void bmi160_read_gyro(gpio_pin_t cs, float *gx, float *gy, float *gz)
 {
-	uint8_t tx_data[13] = { BMI160_DATA_8 | 0x80 };
-	uint8_t rx_data[13] = { 0 };
-	const struct spi_buf tx_buf = { .buf = tx_data, .len = 13 };
-	const struct spi_buf rx_buf = { .buf = rx_data, .len = 13 };
+	uint8_t tx_data[7] = { BMI160_DATA_8 | 0x80 };
+	uint8_t rx_data[7] = { 0 };
+	const struct spi_buf tx_buf = { .buf = tx_data, .len = 7 };
+	const struct spi_buf rx_buf = { .buf = rx_data, .len = 7 };
 	const struct spi_buf_set tx = { .buffers = &tx_buf, .count = 1 };
 	const struct spi_buf_set rx = { .buffers = &rx_buf, .count = 1 };
 
-	gpio_pin_set(gpio, cs, 0);
+	gpio_pin_set(gpio0, cs, 0);
 	spi_transceive(spi_dev, &spi_cfg, &tx, &rx);
-	gpio_pin_set(gpio, cs, 1);
+	gpio_pin_set(gpio0, cs, 1);
 
-	*gx = (int16_t)(rx_data[2] << 8 | rx_data[1]);
-	*gy = (int16_t)(rx_data[4] << 8 | rx_data[3]);
-	*gz = (int16_t)(rx_data[6] << 8 | rx_data[5]);
-	*ax = (int16_t)(rx_data[8] << 8 | rx_data[7]);
-	*ay = (int16_t)(rx_data[10] << 8 | rx_data[9]);
-	*az = (int16_t)(rx_data[12] << 8 | rx_data[11]);
+	int16_t x = (int16_t)(rx_data[2] << 8 | rx_data[1]);
+	int16_t y = (int16_t)(rx_data[4] << 8 | rx_data[3]);
+	int16_t z = (int16_t)(rx_data[6] << 8 | rx_data[5]);
+
+	*gx = (float)x;
+	*gy = (float)y;
+	*gz = (float)z;
 }
 
-/* === Main === */
+/* ================================================================
+ * Gyro fusion: burst averaging + saturation-weighted crossfade
+ * ================================================================ */
+
+static void read_fuse_gyro(float *fx, float *fy, float *fz)
+{
+	float gx_h = 0.0f, gy_h = 0.0f, gz_h = 0.0f;
+	float gx_l = 0.0f, gy_l = 0.0f, gz_l = 0.0f;
+	float tmp_x, tmp_y, tmp_z;
+
+	for (int i = 0; i < BURST_HIGH; i++) {
+		bmi160_read_gyro(CS1_PIN, &tmp_x, &tmp_y, &tmp_z);
+		gx_h += tmp_x;
+		gy_h += tmp_y;
+		gz_h += tmp_z;
+	}
+	gx_h /= (float)BURST_HIGH;
+	gy_h /= (float)BURST_HIGH;
+	gz_h /= (float)BURST_HIGH;
+
+	for (int i = 0; i < BURST_LOW; i++) {
+		bmi160_read_gyro(CS2_PIN, &tmp_x, &tmp_y, &tmp_z);
+		gx_l += tmp_x;
+		gy_l += tmp_y;
+		gz_l += tmp_z;
+	}
+	gx_l /= (float)BURST_LOW;
+	gy_l /= (float)BURST_LOW;
+	gz_l /= (float)BURST_LOW;
+
+	float sat = (fast_fabs(gx_l) > fast_fabs(gy_l)) ? fast_fabs(gx_l) : fast_fabs(gy_l);
+	sat /= 32768.0f;
+
+	float w_high = ramp_mid(sat, 0.2f);
+	float w_low  = 1.0f - w_high;
+
+	*fx = gx_h * w_high + (gx_l / 4.0f) * w_low;
+	*fy = gy_h * w_high + (gy_l / 4.0f) * w_low;
+	*fz = gz_h * w_high + (gz_l / 4.0f) * w_low;
+}
+
+/* ================================================================
+ * HID Mouse
+ * ================================================================ */
+
+static const uint8_t hid_report_desc[] = {
+	0x05, 0x01,        /* Usage Page (Generic Desktop) */
+	0x09, 0x02,        /* Usage (Mouse) */
+	0xA1, 0x01,        /* Collection (Application) */
+	0x09, 0x01,        /*   Usage (Pointer) */
+	0xA1, 0x00,        /*   Collection (Physical) */
+	0x05, 0x09,        /*     Usage Page (Button) */
+	0x19, 0x01,        /*     Usage Minimum (1) */
+	0x29, 0x03,        /*     Usage Maximum (3) */
+	0x15, 0x00,        /*     Logical Minimum (0) */
+	0x25, 0x01,        /*     Logical Maximum (1) */
+	0x95, 0x03,        /*     Report Count (3) */
+	0x75, 0x01,        /*     Report Size (1) */
+	0x81, 0x02,        /*     Input (Data,Var,Abs) */
+	0x95, 0x01,        /*     Report Count (1) */
+	0x75, 0x05,        /*     Report Size (5) */
+	0x81, 0x03,        /*     Input (Const,Var,Abs) */
+	0x05, 0x01,        /*     Usage Page (Generic Desktop) */
+	0x09, 0x30,        /*     Usage (X) */
+	0x09, 0x31,        /*     Usage (Y) */
+	0x16, 0x00, 0x80,  /*     Logical Minimum (-128) */
+	0x26, 0xFF, 0x7F,  /*     Logical Maximum (127) */
+	0x75, 0x08,        /*     Report Size (8) */
+	0x95, 0x02,        /*     Report Count (2) */
+	0x81, 0x06,        /*     Input (Data,Var,Rel) */
+	0x09, 0x38,        /*     Usage (Wheel) */
+	0x15, 0x81,        /*     Logical Minimum (-127) */
+	0x25, 0x7F,        /*     Logical Maximum (127) */
+	0x75, 0x08,        /*     Report Size (8) */
+	0x95, 0x01,        /*     Report Count (1) */
+	0x81, 0x06,        /*     Input (Data,Var,Rel) */
+	0xC0,              /*   End Collection */
+	0xC0               /* End Collection */
+};
+
+static void send_mouse_move(int8_t dx, int8_t dy)
+{
+	uint8_t report[4] = { 0, (uint8_t)dx, (uint8_t)dy, 0 };
+	hid_int_ep_write(hid_dev, report, sizeof(report), NULL);
+}
+
+/* ================================================================
+ * Main
+ * ================================================================ */
+
 int main(void)
 {
 	const struct device *cdc = DEVICE_DT_GET(DT_NODELABEL(cdc_acm_uart0));
-	const struct device *gpio0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 	uint32_t dtr = 0;
 
+	gpio0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 	gpio_pin_configure(gpio0, 15, GPIO_OUTPUT_ACTIVE);
 	gpio_pin_configure(gpio0, CS1_PIN, GPIO_OUTPUT_ACTIVE);
 	gpio_pin_configure(gpio0, CS2_PIN, GPIO_OUTPUT_ACTIVE);
 
 	i2c_dev = DEVICE_DT_GET(DT_NODELABEL(i2c0));
 	if (!device_is_ready(i2c_dev)) {
-		printk("I2C0 not ready\n");
-		return 1;
+		while (1)
+			;
 	}
+	i2c_configure(i2c_dev, I2C_SPEED_SET(I2C_SPEED_FAST));
 
 	spi_dev = DEVICE_DT_GET(DT_NODELABEL(spi1));
 	if (!device_is_ready(spi_dev)) {
-		printk("SPI1 not ready\n");
-		return 1;
+		while (1)
+			;
 	}
+
+	hid_dev = device_get_binding("HID_0");
+	if (!hid_dev) {
+		while (1)
+			;
+	}
+
+	usb_hid_register_device(hid_dev, hid_report_desc, sizeof(hid_report_desc), NULL);
+	usb_hid_init(hid_dev);
 
 	usb_enable(NULL);
 
@@ -200,52 +376,67 @@ int main(void)
 	int adc_addr = scan_adc();
 	if (!adc_addr) {
 		printk("No ADC found\n");
-		while (1) {
-			gpio_pin_toggle(gpio0, 15);
-			k_sleep(K_MSEC(200));
+	} else {
+		printk("ADC at 0x%02X\n", adc_addr);
+
+		uint16_t sum_lsb = 0;
+		for (int i = 0; i < 10; i++) {
+			int16_t v = adc_read_channel(3);
+			sum_lsb += v & 0x0F;
+			k_sleep(K_MSEC(20));
 		}
+		printk(sum_lsb == 0 ? "ADS1015 (12-bit)\n" : "ADS1115 (16-bit)\n");
 	}
-	printk("ADC found at 0x%02X\n", adc_addr);
 
-	uint16_t sum_lsb = 0;
-	for (int i = 0; i < 10; i++) {
-		int16_t v = adc_read_channel(3);
-		sum_lsb += v & 0x0F;
-		k_sleep(K_MSEC(20));
-	}
-	if (sum_lsb == 0)
-		printk("Device: ADS1015 (12-bit)\n");
-	else
-		printk("Device: ADS1115 (16-bit)\n");
+	bool bmi1 = bmi160_init(CS1_PIN, GYRO_RANGE_500);
+	bool bmi2 = bmi160_init(CS2_PIN, GYRO_RANGE_125);
+	printk("BMI160 S1(500dps)=%d S2(125dps)=%d\n", bmi1, bmi2);
 
-	bool bmi1 = bmi160_init(gpio0, CS1_PIN);
-	bool bmi2 = bmi160_init(gpio0, CS2_PIN);
-	printk("BMI160 S1=%d S2=%d\n", bmi1, bmi2);
+	printk("Exp10: Dual-gyro HID mouse running at 250Hz\n");
+	printk("tick\tFX\tFY\tFZ\tCH0\tCH1\tCH2\tCH3\n");
 
-	printk("CH0\tCH1\tCH2\tCH3\t");
-	printk("S1_gX\tS1_gY\tS1_gZ\tS1_aX\tS1_aY\tS1_aZ\t");
-	printk("S2_gX\tS2_gY\tS2_gZ\tS2_aX\tS2_aY\tS2_aZ\n");
-
-	int16_t ax1, ay1, az1, gx1, gy1, gz1;
-	int16_t ax2, ay2, az2, gx2, gy2, gz2;
+	int64_t next_tick = k_uptime_get();
+	int tick_count = 0;
 
 	while (1) {
-		gpio_pin_toggle(gpio0, 15);
+		next_tick += TICK_PERIOD_MS;
+		tick_count++;
 
-		for (int ch = 0; ch < 4; ch++) {
-			int16_t v = adc_read_channel(ch);
-			printk("%d\t", v);
+		float fx, fy, fz;
+		read_fuse_gyro(&fx, &fy, &fz);
+
+		mouse_acc_x += apply_hssnf(fx * GYRO_SENS);
+		mouse_acc_y += apply_hssnf(fy * GYRO_SENS);
+
+		int dx = (int)mouse_acc_x;
+		int dy = (int)mouse_acc_y;
+		mouse_acc_x -= (float)dx;
+		mouse_acc_y -= (float)dy;
+
+		if (dx > 127) dx = 127;
+		if (dx < -128) dx = -128;
+		if (dy > 127) dy = 127;
+		if (dy < -128) dy = -128;
+
+		send_mouse_move((int8_t)dx, (int8_t)dy);
+
+		if (tick_count % ADC_DECIMATION == 0) {
+			int16_t ch0 = adc_read_channel(0);
+			int16_t ch1 = adc_read_channel(1);
+			int16_t ch2 = adc_read_channel(2);
+			int16_t ch3 = adc_read_channel(3);
+			printk("%d\t%.0f\t%.0f\t%.0f\t%d\t%d\t%d\t%d\n",
+			       tick_count, fx, fy, fz, ch0, ch1, ch2, ch3);
 		}
 
-		bmi160_read_data(gpio0, CS1_PIN, &gx1, &gy1, &gz1, &ax1, &ay1, &az1);
-		bmi160_read_data(gpio0, CS2_PIN, &gx2, &gy2, &gz2, &ax2, &ay2, &az2);
+		if (tick_count % LED_DECIMATION == 0) {
+			gpio_pin_toggle(gpio0, 15);
+		}
 
-		printk("%d\t%d\t%d\t%d\t%d\t%d\t",
-		       gx1, gy1, gz1, ax1, ay1, az1);
-		printk("%d\t%d\t%d\t%d\t%d\t%d\n",
-		       gx2, gy2, gz2, ax2, ay2, az2);
-
-		k_sleep(K_MSEC(100));
+		int64_t now = k_uptime_get();
+		if (next_tick > now) {
+			k_sleep(K_MSEC(next_tick - now));
+		}
 	}
 
 	return 0;
