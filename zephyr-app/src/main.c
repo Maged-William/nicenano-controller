@@ -60,9 +60,9 @@ void main(void)
 
 	gpio_pin_configure(gpio0, 15, GPIO_OUTPUT_ACTIVE);
 
-	hid_dev = DEVICE_DT_GET(DT_NODELABEL(hid0));
-	if (!device_is_ready(hid_dev)) {
-		printk("HID device not ready\n");
+	hid_dev = device_get_binding("HID_0");
+	if (!hid_dev) {
+		printk("HID device not found\n");
 		return;
 	}
 
