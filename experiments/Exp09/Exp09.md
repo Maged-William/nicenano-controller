@@ -38,4 +38,35 @@ The existing PlatformIO (Arduino framework) code for reading two BMI160 6-DoF IM
 
 ## Conclusion
 
-*To be filled after experiment execution.*
+**Hypothesis confirmed.** The PlatformIO BMI160 SPI gyro+accel code was successfully ported to Zephyr RTOS v4.1, merged with the existing ADS1015 ADC reading from Exp08. All sensors stream data in a unified output.
+
+### What Worked
+- ✅ **Zephyr SPI API** — `spi_write()`/`spi_transceive()` with manual GPIO CS toggling works correctly
+- ✅ **BMI160 initialization** — Both sensors initialize (chip ID 0xD1) and stream gyro+accel data
+- ✅ **Burst read** — 13-byte `spi_transceive()` correctly reads 12 data bytes starting at register 0x0C
+- ✅ **Merged output** — All 16 values (4 ADC + 6 IMU1 + 6 IMU2) stream in a single tab-separated line
+- ✅ **ADS1015 preserved** — ADC joystick channels continue to work alongside IMU data
+- ✅ **CI pipeline** — GitHub Actions builds cleanly in ~5m48s, produces UF2 artifact
+- ✅ **Automated flashing** — Leonardo on COM29 triggers bootloader, UF2 copy via PowerShell
+
+### Key Differences from PlatformIO
+| Aspect | PlatformIO (Arduino) | Zephyr |
+|--------|---------------------|--------|
+| SPI init | `SPI.setPins(miso, sck, mosi); SPI.begin()` | Devicetree + `device_get_binding()` |
+| Write register | `SPI.transfer(reg & 0x7F); SPI.transfer(val)` | `spi_write()` with 2-byte buffer |
+| Read register | `SPI.transfer(reg \| 0x80); val = SPI.transfer(0x00)` | `spi_transceive()` with 2-byte TX/RX |
+| Burst read | `SPI.transfer(0x8C); for loop SPI.transfer(0x00)` | 13-byte `spi_transceive()` |
+| CS control | `digitalWrite(cs, LOW/HIGH)` | `gpio_pin_set(gpio, cs, 0/1)` |
+| Timing | `delay()` | `k_sleep()` |
+| Serial output | `Serial.print()` | `printk()` |
+
+### Build Time
+| Run | Time | Notes |
+|-----|------|-------|
+| First build | 5m 43s | With two -Wreturn-type warnings (fixed) |
+| Second build | 5m 48s | Clean build after warning fix |
+
+### Data Output Format
+```
+CH0\tCH1\tCH2\tCH3\tS1_gX\tS1_gY\tS1_gZ\tS1_aX\tS1_aY\tS1_aZ\tS2_gX\tS2_gY\tS2_gZ\tS2_aX\tS2_aY\tS2_aZ
+```
