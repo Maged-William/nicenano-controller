@@ -1,3 +1,5 @@
+source "Kconfig.zephyr"
+
 menu "Gyro Mouse Configuration"
 
 config GYRO_MOUSE_ENABLE
