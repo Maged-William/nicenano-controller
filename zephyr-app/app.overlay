@@ -1,8 +1,1 @@
-&usbd {
-	hid0: hid {
-		compatible = "zephyr,hid-device";
-		protocol-code = "mouse";
-		in-report-size = <4>;
-		in-polling-period-us = <1000>;
-	};
-};
+/* Exp08: No HID overlay needed - using raw I2C for ADS1015 */

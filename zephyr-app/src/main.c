@@ -1,54 +1,64 @@
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/usb/usb_device.h>
-#include <zephyr/usb/class/usb_hid.h>
-#include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/uart.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/i2c.h>
+#include <zephyr/device.h>
 
-#define RECT_SIZE  100
-#define STEP_DELAY K_MSEC(10)
+#define ADC_ADDR    0x48
+#define CONV_REG    0x00
+#define CONFIG_REG  0x01
 
-static const struct device *hid_dev;
+static const struct device *i2c_dev;
 
-static const uint8_t hid_report_desc[] = {
-	0x05, 0x01,        /* Usage Page (Generic Desktop) */
-	0x09, 0x02,        /* Usage (Mouse) */
-	0xA1, 0x01,        /* Collection (Application) */
-	0x09, 0x01,        /*   Usage (Pointer) */
-	0xA1, 0x00,        /*   Collection (Physical) */
-	0x05, 0x09,        /*     Usage Page (Button) */
-	0x19, 0x01,        /*     Usage Minimum (1) */
-	0x29, 0x03,        /*     Usage Maximum (3) */
-	0x15, 0x00,        /*     Logical Minimum (0) */
-	0x25, 0x01,        /*     Logical Maximum (1) */
-	0x95, 0x03,        /*     Report Count (3) */
-	0x75, 0x01,        /*     Report Size (1) */
-	0x81, 0x02,        /*     Input (Data,Var,Abs) */
-	0x95, 0x01,        /*     Report Count (1) */
-	0x75, 0x05,        /*     Report Size (5) */
-	0x81, 0x03,        /*     Input (Const,Var,Abs) */
-	0x05, 0x01,        /*     Usage Page (Generic Desktop) */
-	0x09, 0x30,        /*     Usage (X) */
-	0x09, 0x31,        /*     Usage (Y) */
-	0x16, 0x00, 0x80,  /*     Logical Minimum (-128) */
-	0x26, 0xFF, 0x7F,  /*     Logical Maximum (127) */
-	0x75, 0x08,        /*     Report Size (8) */
-	0x95, 0x02,        /*     Report Count (2) */
-	0x81, 0x06,        /*     Input (Data,Var,Rel) */
-	0x09, 0x38,        /*     Usage (Wheel) */
-	0x15, 0x81,        /*     Logical Minimum (-127) */
-	0x25, 0x7F,        /*     Logical Maximum (127) */
-	0x75, 0x08,        /*     Report Size (8) */
-	0x95, 0x01,        /*     Report Count (1) */
-	0x81, 0x06,        /*     Input (Data,Var,Rel) */
-	0xC0,              /*   End Collection */
-	0xC0               /* End Collection */
-};
-
-static void send_mouse_move(int8_t dx, int8_t dy)
+static int write_reg(uint8_t reg, uint16_t val)
 {
-	uint8_t report[4] = { 0, (uint8_t)dx, (uint8_t)dy, 0 };
-	hid_int_ep_write(hid_dev, report, sizeof(report), NULL);
+	uint8_t buf[3] = { reg, val >> 8, val & 0xFF };
+	return i2c_write(i2c_dev, buf, sizeof(buf), ADC_ADDR);
+}
+
+static int read_reg(uint8_t reg, uint16_t *val)
+{
+	uint8_t rx[2];
+	int ret = i2c_write_read(i2c_dev, ADC_ADDR, &reg, 1, rx, 2);
+	if (ret == 0) {
+		*val = (rx[0] << 8) | rx[1];
+	}
+	return ret;
+}
+
+static int16_t read_channel(uint8_t ch)
+{
+	uint16_t cfg = (1 << 15)
+		     | ((0b100 | (ch & 3)) << 12)
+		     | (0b001 << 9)
+		     | (1 << 8)
+		     | (0b100 << 5)
+		     | 0b0000011;
+
+	write_reg(CONFIG_REG, cfg);
+
+	uint16_t status;
+	int timeout = 100;
+	do {
+		if (read_reg(CONFIG_REG, &status) != 0) return 0;
+		if (--timeout <= 0) return 0;
+	} while (!(status & (1 << 15)));
+
+	uint16_t raw;
+	read_reg(CONV_REG, &raw);
+	return (int16_t)raw;
+}
+
+static int scan_adc(void)
+{
+	for (uint8_t addr = 0x48; addr <= 0x4B; addr++) {
+		if (i2c_write(i2c_dev, NULL, 0, addr) == 0) {
+			return addr;
+		}
+	}
+	return 0;
 }
 
 void main(void)
@@ -56,18 +66,14 @@ void main(void)
 	const struct device *cdc = DEVICE_DT_GET(DT_NODELABEL(cdc_acm_uart0));
 	const struct device *gpio0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 	uint32_t dtr = 0;
-	int x = 0, y = 0;
 
 	gpio_pin_configure(gpio0, 15, GPIO_OUTPUT_ACTIVE);
 
-	hid_dev = device_get_binding("HID_0");
-	if (!hid_dev) {
-		printk("HID device not found\n");
+	i2c_dev = DEVICE_DT_GET(DT_NODELABEL(i2c0));
+	if (!device_is_ready(i2c_dev)) {
+		printk("I2C0 not ready\n");
 		return;
 	}
-
-	usb_hid_register_device(hid_dev, hid_report_desc, sizeof(hid_report_desc), NULL);
-	usb_hid_init(hid_dev);
 
 	usb_enable(NULL);
 
@@ -78,34 +84,38 @@ void main(void)
 
 	k_sleep(K_SECONDS(1));
 
-	printk("Exp07: HID Mouse starting - rectangle %dx%d\n", RECT_SIZE, RECT_SIZE);
+	int addr = scan_adc();
+	if (!addr) {
+		printk("No ADC found\n");
+		while (1) {
+			gpio_pin_toggle(gpio0, 15);
+			k_sleep(K_MSEC(200));
+		}
+	}
+	printk("ADC found at 0x%02X\n", addr);
+
+	uint16_t sum_lsb = 0;
+	for (int i = 0; i < 10; i++) {
+		int16_t v = read_channel(3);
+		sum_lsb += v & 0x0F;
+		k_sleep(K_MSEC(20));
+	}
+	if (sum_lsb == 0)
+		printk("Device: ADS1015 (12-bit)\n");
+	else
+		printk("Device: ADS1115 (16-bit)\n");
+
+	printk("CH0(JoyA-X)\tCH1(JoyA-Y)\tCH2(JoyB-X)\tCH3(JoyB-Y)\n");
 
 	while (1) {
 		gpio_pin_toggle(gpio0, 15);
 
-		for (int i = 0; i < RECT_SIZE; i++) {
-			send_mouse_move(1, 0);
-			x++;
-			printk("X:%d Y:%d\n", x, y);
-			k_sleep(STEP_DELAY);
+		for (int ch = 0; ch < 4; ch++) {
+			int16_t v = read_channel(ch);
+			printk("%d\t", v);
 		}
-		for (int i = 0; i < RECT_SIZE; i++) {
-			send_mouse_move(0, 1);
-			y++;
-			printk("X:%d Y:%d\n", x, y);
-			k_sleep(STEP_DELAY);
-		}
-		for (int i = 0; i < RECT_SIZE; i++) {
-			send_mouse_move(-1, 0);
-			x--;
-			printk("X:%d Y:%d\n", x, y);
-			k_sleep(STEP_DELAY);
-		}
-		for (int i = 0; i < RECT_SIZE; i++) {
-			send_mouse_move(0, -1);
-			y--;
-			printk("X:%d Y:%d\n", x, y);
-			k_sleep(STEP_DELAY);
-		}
+		printk("\n");
+
+		k_sleep(K_MSEC(100));
 	}
 }
