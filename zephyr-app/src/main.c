@@ -6,7 +6,6 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/i2c.h>
 #include <zephyr/drivers/spi.h>
-#include <zephyr/drivers/flash.h>
 #include <zephyr/device.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -323,52 +322,6 @@ static void calibrate_gyro(void)
 }
 
 /* ================================================================
- * Flash storage for calibration data
- * ================================================================ */
-
-#define CAL_MAGIC     0xCA10BEEF
-#define STORAGE_OFFS  0xec000
-#define FLASH_PAGE_SZ 4096
-
-struct cal_data {
-	uint32_t magic;
-	float s1x, s1y, s1z;
-	float s2x, s2y, s2z;
-};
-
-static int save_calibration(void)
-{
-	const struct device *flash_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_flash));
-	if (!device_is_ready(flash_dev)) return -1;
-
-	struct cal_data cal = {
-		.magic = CAL_MAGIC,
-		.s1x = cal_s1x, .s1y = cal_s1y, .s1z = cal_s1z,
-		.s2x = cal_s2x, .s2y = cal_s2y, .s2z = cal_s2z,
-	};
-
-	int err = flash_erase(flash_dev, STORAGE_OFFS, FLASH_PAGE_SZ);
-	if (err) return err;
-
-	return flash_write(flash_dev, STORAGE_OFFS, &cal, sizeof(cal));
-}
-
-static int load_calibration(void)
-{
-	const struct device *flash_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_flash));
-	if (!device_is_ready(flash_dev)) return -1;
-
-	struct cal_data cal;
-	int err = flash_read(flash_dev, STORAGE_OFFS, &cal, sizeof(cal));
-	if (err || cal.magic != CAL_MAGIC) return -1;
-
-	cal_s1x = cal.s1x; cal_s1y = cal.s1y; cal_s1z = cal.s1z;
-	cal_s2x = cal.s2x; cal_s2y = cal.s2y; cal_s2z = cal.s2z;
-
-	return 0;
-}
-
-/* ================================================================
  * HID Mouse
  * ================================================================ */
 
@@ -477,12 +430,7 @@ int main(void)
 	bool bmi2 = bmi160_init(CS2_PIN, GYRO_RANGE_125);
 	printk("BMI160 S1(500dps)=%d S2(125dps)=%d\n", bmi1, bmi2);
 
-	if (load_calibration() == 0) {
-		printk("Loaded stored gyro calibration\n");
-	} else {
-		calibrate_gyro();
-		save_calibration();
-	}
+	calibrate_gyro();
 
 	printk("Exp10: Dual-gyro HID mouse running at 250Hz\n");
 	printk("tick\tFX\tFY\tFZ\tCH0\tCH1\tCH2\tCH3\n");
