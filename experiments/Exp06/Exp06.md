@@ -34,9 +34,9 @@ Zephyr RTOS v4.1 can be set up as a standalone build targeting the nice!nano nRF
 
 ## Success Criteria
 
-- [ ] GitHub Action builds successfully with no errors
-- [ ] UF2 artifact is produced and downloadable
-- [ ] Flashing to nice!nano results in visible "Hello World from Zephyr!" output on serial monitor at 3-second intervals
+- [x] GitHub Action builds successfully with no errors
+- [x] UF2 artifact is produced and downloadable
+- [x] Flashing to nice!nano results in visible "Hello World from Zephyr!" output on serial monitor at 3-second intervals
 
 ## Challenges
 
@@ -47,4 +47,56 @@ Zephyr RTOS v4.1 can be set up as a standalone build targeting the nice!nano nRF
 
 ## Conclusion
 
-*(to be filled after execution)*
+**Hypothesis confirmed.** Zephyr RTOS v4.1 builds, flashes, and runs on the nice!nano, printing "Hello World" over USB serial at 3-second intervals — all via GitHub Actions CI with no local toolchain.
+
+### What Worked
+
+- ✅ **GitHub Actions CI** — Fully automated build pipeline produces UF2 artifacts in ~5 minutes (first build: 6m36s; subsequent with ARM GCC cache: ~5m)
+- ✅ **Out-of-tree board definition** — Custom `nice_nano` board with correct pin mappings (I2C: P0.17/P0.20, SPI: P0.06/P0.08/P0.02) using HWMv2 format
+- ✅ **UF2 output** — `CONFIG_BUILD_OUTPUT_UF2=y` produces valid UF2 at `build/zephyr/zephyr.uf2`
+- ✅ **USB CDC ACM enumeration** — Three-part fix:
+  1. `cdc_acm_uart0` as a child node of `&usbd` in the devicetree
+  2. `zephyr,console` + `zephyr,shell-uart` chosen entries pointing to it
+  3. `CONFIG_CONSOLE=y` + `CONFIG_UART_CONSOLE=y` in Kconfig
+- ✅ **DTR gating** — Firmware waits for terminal to open the port before printing, preventing early-output loss
+- ✅ **USB serial number** — `CONFIG_USB_DEVICE_SN="NICENANO-DEV-01"` provides a stable identifier to distinguish this board from other nice!nano devices
+- ✅ **Leonardo flash automation** — `b` command triggers bootloader, UF2 copy to `G:\` completes within seconds
+
+### What Didn't Work
+
+- ❌ **Initial approach** — Using the bare `&usbd` without a CDC ACM child node. The USB device controller enabled, but no ACM interface was added to the USB descriptor, so no COM port appeared despite successful `usb_enable(NULL)`. This is the key learning: in Zephyr v4.1, CDC ACM is devicetree-driven.
+- ❌ **Standalone `cdc_acm_uart0` root node** — Adding the node outside `&usbd` failed with a build-time static assertion (`"node is not assigned to a USB device controller"`). The node must be a *child* of the USB device controller.
+
+### Build Times
+
+| Run | Time | Notes |
+|-----|------|-------|
+| First build | 6m 36s | Cold cache — ARM GCC download + full `west update` |
+| Subsequent (toolchain cached) | ~5m | Only source rebuild (~2m) + toolchain cache restore (~3m) |
+| Incremental (source change only) | ~5m | Most time is setup overhead; compile itself is fast (~1m) |
+
+### Final Project Structure
+
+```
+Dev/
+├── .github/workflows/build.yml   # GitHub Actions CI
+├── zephyr-app/                   # Zephyr application root
+│   ├── west.yml                  # Manifest (upstream Zephyr v4.1.0)
+│   ├── CMakeLists.txt            # App entry
+│   ├── prj.conf                  # USB CDC ACM + console config
+│   ├── src/main.c                # Hello world with DTR gating
+│   └── module/                   # Out-of-tree board definition
+│       ├── zephyr/module.yml
+│       └── boards/nicekeyboards/nice_nano/
+│           ├── board.yml
+│           ├── Kconfig.nice_nano
+│           ├── nice_nano.dts
+│           ├── nice_nano-pinctrl.dtsi
+│           ├── arduino_pro_micro_pins.dtsi
+│           ├── nice_nano_2_0_0_defconfig
+│           ├── nice_nano_1_0_0_defconfig
+│           ├── pre_dt_board.cmake
+│           └── board.cmake
+└── builds/                       # Downloaded CI artifacts (gitignored)
+    └── Exp06-*/
+```
