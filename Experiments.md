@@ -7,3 +7,4 @@
 | Exp03 | ✅ Complete | Read speed optimization — ready-bit polling, I2C 400kHz, remove throttling |
 | Exp04 | ✅ Complete | SPI connection to dual BMI160 IMU sensors — chip ID detect, accel+gyro streaming |
 | Exp05 | ⚠️ Partial | Automated flashing via serial bootloader command — serial command works, bootloader enters DFU mode, but MSC drive doesn't enumerate after GPREGRET reset (only after double-tap) |
+| Exp06 | 🔄 In Progress | Zephyr RTOS v4.1 — Hello World via GitHub Actions CI, UF2 output, serial monitor verification |

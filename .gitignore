@@ -2,3 +2,16 @@
 experiments/*/firmware/.pio/
 experiments/*/firmware/firmware.uf2
 firmware.uf2
+
+# Zephyr build artifacts
+build/
+.build/
+zephyr/
+modules/
+bootloader/
+tools/
+.west/
+
+# Downloaded CI builds
+builds/
+!builds/.gitignore
