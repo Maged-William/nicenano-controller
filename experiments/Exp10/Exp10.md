@@ -38,11 +38,11 @@ Alpakka firmware uses a proven approach for dual-IMU gyro fusion:
 
 ## Success Criteria
 
-- [ ] Firmware builds with no errors on GitHub Actions, produces UF2 artifact
-- [ ] nice!nano enumerates as composite USB: CDC ACM (serial) + HID (mouse)
-- [ ] Cursor moves with physical board rotation — smooth at low speeds, responsive at high speeds
-- [ ] Serial output shows fused gyro values and ADS1015 ADC readings
-- [ ] LED heartbeats at ~2.5Hz
+- [x] Firmware builds with no errors on GitHub Actions, produces UF2 artifact
+- [x] nice!nano enumerates as composite USB: CDC ACM (serial) + HID (mouse)
+- [x] Cursor moves with physical board rotation — smooth at low speeds, responsive at high speeds
+- [x] Serial output shows fused gyro values and ADS1015 ADC readings
+- [x] LED heartbeats at ~2.5Hz
 
 ## Challenges
 
@@ -74,3 +74,32 @@ BMI160 #2 (±125°/s, 112 samples/tick) ─┘
 
 ADS1015 (4 channels, every 25th tick) → serial debug
 ```
+
+## Conclusion
+
+**Hypothesis confirmed.** Two BMI160 sensors at different gyro ranges (±125°/s and ±500°/s), combined via saturation-weighted crossfade with asymmetric burst averaging, successfully drive a USB HID mouse cursor from the nice!nano nRF52840.
+
+### What Worked
+
+- ✅ **Composite USB** — CDC ACM (serial) + HID (mouse) coexisting on one device
+- ✅ **Dual-range init** — BMI160 sensors properly configured at ±125°/s and ±500°/s (register addresses fixed from Exp09)
+- ✅ **Burst averaging** — 128 total samples (16 high + 112 low) per tick provides noise reduction
+- ✅ **Saturation-weighted crossfade** — `ramp_mid(weight, 0.2)` smoothly blends between low-range precision and high-range headroom
+- ✅ **HSSNF filter** — Schlick-bias curve amplifies small movements, improving fine cursor control feel
+- ✅ **Float accumulation** — Fractional pixel values accumulate between ticks, sub-pixel precision preserved
+- ✅ **250Hz loop** — After fixing the next_tick initialization to post-init, loop runs at consistent 250Hz
+- ✅ **ADS1015 preserved** — Joystick channels continue to stream for debug alongside gyro data
+
+### What Was Fixed
+
+| Bug | Root Cause | Fix |
+|-----|-----------|-----|
+| **Loop running at >1000Hz** | `next_tick` captured before ~2s of init code → deadline always in past → sleep skipped | Moved `next_tick = k_uptime_get()` to right before `while(1)` |
+| **Wrong register addresses** | `BMI160_ACCEL_CONF` mapped to 0x41 (actually 0x40), `BMI160_GYRO_CONF` mapped to 0x43 (actually 0x42) | Corrected to 0x40 and 0x42; range writes go to 0x41 and 0x43 |
+
+### Build Time
+
+| Run | Time | Notes |
+|-----|------|-------|
+| First build (fix Kconfig) | 4m 55s | Failed on undefined CONFIG_PRINTK_FMT_FLOAT |
+| Second build (Kconfig fix) | 5m 35s | Clean build, UF2 artifact uploaded |
