@@ -395,8 +395,10 @@ int main(void)
 	printk("Exp10: Dual-gyro HID mouse running at 250Hz\n");
 	printk("tick\tFX\tFY\tFZ\tCH0\tCH1\tCH2\tCH3\n");
 
-	int64_t next_tick = k_uptime_get();
+	int64_t next_tick;
 	int tick_count = 0;
+
+	next_tick = k_uptime_get();
 
 	while (1) {
 		next_tick += TICK_PERIOD_MS;
