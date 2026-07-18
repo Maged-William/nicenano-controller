@@ -8,4 +8,4 @@
 | Exp04 | ✅ Complete | SPI connection to dual BMI160 IMU sensors — chip ID detect, accel+gyro streaming |
 | Exp05 | ⚠️ Partial | Automated flashing via serial bootloader command — serial command works, bootloader enters DFU mode, but MSC drive doesn't enumerate after GPREGRET reset (only after double-tap) |
 | Exp06 | ✅ Complete | Zephyr RTOS v4.1 — Hello World via GitHub Actions CI, UF2 output, serial monitor verification |
-| Exp07 | 🔄 In Progress | USB HID Mouse — synthetic rectangle motion (100×100) via Zephyr, CDC ACM + HID composite |
+| Exp07 | ✅ Complete | USB HID Mouse — synthetic rectangle motion (100×100) via Zephyr, CDC ACM + HID composite |

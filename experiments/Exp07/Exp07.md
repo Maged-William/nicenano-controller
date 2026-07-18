@@ -32,3 +32,36 @@ The nice!nano nRF52840 can enumerate as a USB HID mouse (via Zephyr RTOS v4.1) a
 - **Devicetree binding** — `zephyr,hid-device` requires specific properties (`in-report-size`, `in-polling-period-us`) that must match the report descriptor
 - **Enumeration timing** — HID reports sent before USB enumeration completes may be lost; need proper startup delay
 - **Relative vs absolute positioning** — The cursor starts from wherever it currently is; rectangle will drift if any steps are dropped
+
+## Conclusion
+
+**Hypothesis confirmed.** The nice!nano nRF52840 successfully enumerates as a composite USB device (CDC ACM + HID) under Zephyr RTOS v4.1 and drives the host cursor in a synthetic 100×100 pixel rectangle, repeating indefinitely.
+
+### What Worked
+
+- ✅ **Composite USB device** — CDC ACM (serial debug via `printk`) and HID (mouse) coexist on a single USB device with two interfaces
+- ✅ **HID report descriptor** — Standard 4-byte mouse report (buttons + relative X/Y + wheel) correctly interpreted by the host OS
+- ✅ **Rectangle motion** — Firmware sends `+1,0` × 100 (right), `0,+1` × 100 (down), `-1,0` × 100 (left), `0,-1` × 100 (up) at 10ms/pixel, completing one full loop in ~4 seconds
+- ✅ **Serial debug** — Position coordinates printed over CDC ACM each step confirm correct movement
+- ✅ **CI pipeline** — GitHub Actions builds successfully in ~5m34s, produces UF2 artifact
+- ✅ **Automated flashing** — Leonardo on COM29 triggers bootloader, UF2 copies to NICENANO drive
+
+### What Didn't Work
+
+- ❌ **`DEVICE_DT_GET(DT_NODELABEL(hid0))`** — The HID driver registers under a string name ("HID_0"), not via `DEVICE_DT_DEFINE`. Must use `device_get_binding("HID_0")` instead.
+- ❌ **`CONFIG_USB_HID`** — The correct Kconfig symbol is `CONFIG_USB_DEVICE_HID` (not `USB_HID`), and `CONFIG_USB_DEVICE_INITIALIZE_AT_BOOT=n` must be set since `usb_enable(NULL)` is called manually after HID registration.
+
+### Key Learnings
+
+- The `app.overlay` devicetree overlay is the correct place to add the HID device node under `&usbd`
+- `in-report-size` and `in-polling-period-us` are required properties in the `zephyr,hid-device` binding
+- When both CDC ACM and HID are enabled, Zephyr automatically composes them into a single composite USB device
+- DTR gating still works with composite devices — the serial port appears once the terminal connects
+
+### Build Time
+
+| Run | Time | Notes |
+|-----|------|-------|
+| First build (no cache) | 5m 02s | ARM GCC toolchain cached from Exp06; full west update |
+| Second build (fix Kconfig) | 5m 43s | Full rebuild after config change |
+| Third build (fix binding) | 5m 34s | Incremental compilation of app only |
