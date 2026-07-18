@@ -179,13 +179,13 @@ int main(void)
 	i2c_dev = DEVICE_DT_GET(DT_NODELABEL(i2c0));
 	if (!device_is_ready(i2c_dev)) {
 		printk("I2C0 not ready\n");
-		return;
+		return 1;
 	}
 
 	spi_dev = DEVICE_DT_GET(DT_NODELABEL(spi1));
 	if (!device_is_ready(spi_dev)) {
 		printk("SPI1 not ready\n");
-		return;
+		return 1;
 	}
 
 	usb_enable(NULL);
