@@ -1,0 +1,8 @@
+&usbd {
+	hid0: hid {
+		compatible = "zephyr,hid-device";
+		protocol-code = "mouse";
+		in-report-size = <4>;
+		in-polling-period-us = <1000>;
+	};
+};
