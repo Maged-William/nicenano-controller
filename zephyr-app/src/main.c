@@ -338,7 +338,7 @@ struct cal_data {
 
 static int save_calibration(void)
 {
-	const struct device *flash_dev = DEVICE_DT_GET(DT_NODELABEL(flash0));
+	const struct device *flash_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_flash));
 	if (!device_is_ready(flash_dev)) return -1;
 
 	struct cal_data cal = {
@@ -355,7 +355,7 @@ static int save_calibration(void)
 
 static int load_calibration(void)
 {
-	const struct device *flash_dev = DEVICE_DT_GET(DT_NODELABEL(flash0));
+	const struct device *flash_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_flash));
 	if (!device_is_ready(flash_dev)) return -1;
 
 	struct cal_data cal;
