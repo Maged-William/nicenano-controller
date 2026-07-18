@@ -3,7 +3,8 @@
   "permission": {
     "external_directory": {
       "G:/**": "allow",
-      "C:/Users/MW/.platformio/**": "allow"
+      "C:/Users/MW/.platformio/**": "allow",
+      "C:/Users/MW/AppData/Local/Temp/**" : "allow"
     }
   }
 }

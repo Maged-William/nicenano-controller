@@ -60,6 +60,8 @@ As long as you havent reached the desired outcome, keep on looping, only the use
 
 Write the Code -> build it -> Send 'b' to Leonardo -> copy the firmware to the nicenano -> using Putty inspect the serial monitor
 
+If you are using github action:
+Write the code -> commit, push -> check how much a successful build takes, note it, wait that amount -> check the logs
 
 # Building & Flashing
 

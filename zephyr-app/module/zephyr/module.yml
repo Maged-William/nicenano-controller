@@ -1,5 +1,2 @@
-build:
-  cmake: .
-  kconfig: Kconfig
-  settings:
-    board_root: .
+settings:
+  board_root: .
