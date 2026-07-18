@@ -63,6 +63,8 @@ Write the Code -> build it -> Send 'b' to Leonardo -> copy the firmware to the n
 If you are using github action:
 Write the code -> commit, push -> check how much a successful build takes, note it, wait that amount -> check the logs
 
+$runId = (gh run list --branch Exp06 --limit 1 --json databaseId --jq '.[0].databaseId'); Write-Output "Run ID: $runId"; gh run watch $runId --interval 15
+
 # Building & Flashing
 
 ## Build (Windows)
