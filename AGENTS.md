@@ -1,7 +1,7 @@
 # Rules
 
 - Be autonomous, don't inturrupt the flow.
-- Never ask the user to read the serial monitor, you the Assistant should read it, use Putty, most likely you want COM27 115200.
+- Never ask the user to read the serial monitor, you the Assistant should read it, use Putty, most likely you want COM30 115200.
 - Don't scan other projects or folders outside this folder.
 - We are starting Fresh, ignore any other attempts in other folders.
 
@@ -104,6 +104,27 @@ simply detect the leonardo and send 'b' and wait 3 seconds it should be in bootl
 Then copy `firmware.uf2` to the `NICENANO` drive (`G:/`).
 
 If you the nicenano stuck send 'r' to the leonardo it will send one pulse hence reseting the nicenano
+
+
+# Insepcting the serial monitor
+
+```
+$ $port = New-Object System.IO.Ports.SerialPort "COM30", 115200, None, 8, 1
+$port.ReadTimeout = 10000
+$port.DtrEnable = $true
+$port.Open()
+Start-Sleep -Seconds 3
+try {
+    $data = $port.ReadExisting()
+    Write-Output "=== SERIAL OUTPUT ==="
+    Write-Output $data
+} catch {
+    Write-Output "No data received"
+}
+$port.Close()
+```
+Or use Putty
+
 
 # Experiments
 
