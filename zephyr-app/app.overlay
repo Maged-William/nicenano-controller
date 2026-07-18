@@ -1,1 +1,3 @@
-/* Exp08: No HID overlay needed - using raw I2C for ADS1015 */
+/* Exp09: SPI1 is already enabled in board DTS (SCK=P0.06, MOSI=P0.08, MISO=P0.02).
+ * CS pins for BMI160 sensors are driven as plain GPIOs (P0.31, P0.29).
+ * I2C0 remains for ADS1015 ADC. */
