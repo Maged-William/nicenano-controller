@@ -20,8 +20,8 @@
 #define CONFIG_REG      0x01
 
 /* --- BMI160 SPI --- */
-#define CS1_PIN         31   /* high-range sensor: gyro ±500°/s */
-#define CS2_PIN         29   /* low-range  sensor: gyro ±125°/s */
+#define CS1_PIN         CONFIG_GYRO_MOUSE_CS1_PIN
+#define CS2_PIN         CONFIG_GYRO_MOUSE_CS2_PIN
 
 #define BMI160_CHIPID      0x00
 #define BMI160_PMU_STATUS  0x03
@@ -32,29 +32,77 @@
 #define BMI160_GYRO_RANGE  0x43
 #define BMI160_CMD         0x7E
 
-#define GYRO_RANGE_125  0x04
-#define GYRO_RANGE_500  0x02
 #define ACCEL_RANGE_2G  0x03
-#define ODR_1600HZ      0x0C
+
+/* Gyro range to register value */
+#if CONFIG_GYRO_MOUSE_S1_RANGE == 125
+#define S1_GYRO_RANGE_REG  0x04
+#elif CONFIG_GYRO_MOUSE_S1_RANGE == 250
+#define S1_GYRO_RANGE_REG  0x03
+#elif CONFIG_GYRO_MOUSE_S1_RANGE == 500
+#define S1_GYRO_RANGE_REG  0x02
+#elif CONFIG_GYRO_MOUSE_S1_RANGE == 1000
+#define S1_GYRO_RANGE_REG  0x01
+#elif CONFIG_GYRO_MOUSE_S1_RANGE == 2000
+#define S1_GYRO_RANGE_REG  0x00
+#else
+#error "Invalid GYRO_MOUSE_S1_RANGE"
+#endif
+
+#if CONFIG_GYRO_MOUSE_S2_RANGE == 125
+#define S2_GYRO_RANGE_REG  0x04
+#elif CONFIG_GYRO_MOUSE_S2_RANGE == 250
+#define S2_GYRO_RANGE_REG  0x03
+#elif CONFIG_GYRO_MOUSE_S2_RANGE == 500
+#define S2_GYRO_RANGE_REG  0x02
+#elif CONFIG_GYRO_MOUSE_S2_RANGE == 1000
+#define S2_GYRO_RANGE_REG  0x01
+#elif CONFIG_GYRO_MOUSE_S2_RANGE == 2000
+#define S2_GYRO_RANGE_REG  0x00
+#else
+#error "Invalid GYRO_MOUSE_S2_RANGE"
+#endif
+
+#if CONFIG_GYRO_MOUSE_ODR == 25
+#define ODR_REG  0x06
+#elif CONFIG_GYRO_MOUSE_ODR == 50
+#define ODR_REG  0x07
+#elif CONFIG_GYRO_MOUSE_ODR == 100
+#define ODR_REG  0x08
+#elif CONFIG_GYRO_MOUSE_ODR == 200
+#define ODR_REG  0x09
+#elif CONFIG_GYRO_MOUSE_ODR == 400
+#define ODR_REG  0x0A
+#elif CONFIG_GYRO_MOUSE_ODR == 800
+#define ODR_REG  0x0B
+#elif CONFIG_GYRO_MOUSE_ODR == 1600
+#define ODR_REG  0x0C
+#else
+#error "Invalid GYRO_MOUSE_ODR"
+#endif
 
 /* --- Burst averaging --- */
-#define BURST_TOTAL  128
-#define BURST_HIGH   16
-#define BURST_LOW    112
+#define BURST_HIGH  CONFIG_GYRO_MOUSE_BURST_HIGH
+#define BURST_LOW   CONFIG_GYRO_MOUSE_BURST_LOW
+#define BURST_TOTAL (BURST_HIGH + BURST_LOW)
 
-/* --- Loop timing: 250 Hz → 4 ms ticks --- */
-#define TICK_PERIOD_MS  4
-#define ADC_DECIMATION  25   /* read ADC every 25 ticks (10 Hz) */
-#define LED_DECIMATION  100  /* toggle LED every 100 ticks (2.5 Hz) */
+/* --- Loop timing --- */
+#define TICK_PERIOD_MS  CONFIG_GYRO_MOUSE_TICK_PERIOD_MS
+#define ADC_DECIMATION  CONFIG_GYRO_MOUSE_ADC_DECIMATION
+#define LED_DECIMATION  CONFIG_GYRO_MOUSE_LED_DECIMATION
 
-/* --- Sensitivity (empirical, will tune) --- */
-#define GYRO_SENS  0.001f
+/* --- Sensitivity --- */
+#define GYRO_SENS  ((float)CONFIG_GYRO_MOUSE_SENSITIVITY_NUM / (float)CONFIG_GYRO_MOUSE_SENSITIVITY_DENOM)
 
-/* --- HSSNF parameters --- */
-#define HSSNF_T  1.0f
-#define HSSNF_K  0.5f
+/* --- HSSNF parameters (scaled by 1000 in Kconfig) --- */
+#define HSSNF_T  (CONFIG_GYRO_MOUSE_HSSNF_T / 1000.0f)
+#define HSSNF_K  (CONFIG_GYRO_MOUSE_HSSNF_K / 1000.0f)
 
-#define MOUSE_REPORT_SIZE  4
+/* --- Crossfade --- */
+#define CROSSFADE_Z  (CONFIG_GYRO_MOUSE_CROSSFADE_Z / 1000.0f)
+
+/* --- Deadzone (scaled by 1000 in Kconfig) --- */
+#define DEADZONE_THR  (CONFIG_GYRO_MOUSE_DEADZONE / 1000.0f)
 
 /* ================================================================
  * Global state
@@ -66,7 +114,7 @@ static const struct device *hid_dev;
 static const struct device *gpio0;
 
 static const struct spi_config spi_cfg = {
-	.frequency = 8000000,
+	.frequency = CONFIG_GYRO_MOUSE_SPI_FREQ,
 	.operation = SPI_OP_MODE_MASTER | SPI_WORD_SET(8) | SPI_TRANSFER_MSB,
 	.slave = 0,
 };
@@ -100,6 +148,9 @@ static float hssnf(float t, float k, float x)
 
 static float apply_hssnf(float x)
 {
+#if !CONFIG_GYRO_MOUSE_HSSNF_ENABLE
+	return x;
+#endif
 	if (x > 0.0f && x < HSSNF_T)
 		return hssnf(HSSNF_T, HSSNF_K, x);
 	if (x < 0.0f && x > -HSSNF_T)
@@ -215,8 +266,8 @@ static bool bmi160_init(gpio_pin_t cs, uint8_t gyro_range)
 	}
 	if (timeout <= 0) return false;
 
-	bmi160_write_reg(cs, BMI160_ACCEL_CONF, ODR_1600HZ);
-	bmi160_write_reg(cs, BMI160_GYRO_CONF, ODR_1600HZ);
+	bmi160_write_reg(cs, BMI160_ACCEL_CONF, ODR_REG);
+	bmi160_write_reg(cs, BMI160_GYRO_CONF, ODR_REG);
 	bmi160_write_reg(cs, BMI160_ACCEL_RANGE, ACCEL_RANGE_2G);
 	bmi160_write_reg(cs, BMI160_GYRO_RANGE, gyro_range);
 
@@ -282,7 +333,7 @@ static void read_fuse_gyro(float *fx, float *fy, float *fz)
 	float sat = (fast_fabs(gx_l) > fast_fabs(gy_l)) ? fast_fabs(gx_l) : fast_fabs(gy_l);
 	sat /= 32768.0f;
 
-	float w_high = ramp_mid(sat, 0.2f);
+	float w_high = ramp_mid(sat, CROSSFADE_Z);
 	float w_low  = 1.0f - w_high;
 
 	*fx = gx_h * w_high + (gx_l / 4.0f) * w_low;
@@ -294,8 +345,6 @@ static void read_fuse_gyro(float *fx, float *fy, float *fz)
  * Gyro calibration (stationary offset measurement)
  * ================================================================ */
 
-#define CAL_SAMPLES  500
-
 static void calibrate_gyro(void)
 {
 	float sx1 = 0, sy1 = 0, sz1 = 0;
@@ -303,7 +352,7 @@ static void calibrate_gyro(void)
 	float tx, ty, tz;
 
 	printk("Calibrating gyro (hold still)... ");
-	for (int i = 0; i < CAL_SAMPLES; i++) {
+	for (int i = 0; i < CONFIG_GYRO_MOUSE_CAL_SAMPLES; i++) {
 		bmi160_read_gyro(CS1_PIN, &tx, &ty, &tz, 0, 0, 0);
 		sx1 += tx; sy1 += ty; sz1 += tz;
 		bmi160_read_gyro(CS2_PIN, &tx, &ty, &tz, 0, 0, 0);
@@ -311,12 +360,12 @@ static void calibrate_gyro(void)
 		k_busy_wait(4000);
 	}
 
-	cal_s1x = sx1 / (float)CAL_SAMPLES;
-	cal_s1y = sy1 / (float)CAL_SAMPLES;
-	cal_s1z = sz1 / (float)CAL_SAMPLES;
-	cal_s2x = sx2 / (float)CAL_SAMPLES;
-	cal_s2y = sy2 / (float)CAL_SAMPLES;
-	cal_s2z = sz2 / (float)CAL_SAMPLES;
+	cal_s1x = sx1 / (float)CONFIG_GYRO_MOUSE_CAL_SAMPLES;
+	cal_s1y = sy1 / (float)CONFIG_GYRO_MOUSE_CAL_SAMPLES;
+	cal_s1z = sz1 / (float)CONFIG_GYRO_MOUSE_CAL_SAMPLES;
+	cal_s2x = sx2 / (float)CONFIG_GYRO_MOUSE_CAL_SAMPLES;
+	cal_s2y = sy2 / (float)CONFIG_GYRO_MOUSE_CAL_SAMPLES;
+	cal_s2z = sz2 / (float)CONFIG_GYRO_MOUSE_CAL_SAMPLES;
 
 	printk("done\n");
 }
@@ -426,11 +475,25 @@ int main(void)
 		printk(sum_lsb == 0 ? "ADS1015 (12-bit)\n" : "ADS1115 (16-bit)\n");
 	}
 
-	bool bmi1 = bmi160_init(CS1_PIN, GYRO_RANGE_500);
-	bool bmi2 = bmi160_init(CS2_PIN, GYRO_RANGE_125);
-	printk("BMI160 S1(500dps)=%d S2(125dps)=%d\n", bmi1, bmi2);
+	bool bmi1 = bmi160_init(CS1_PIN, S1_GYRO_RANGE_REG);
+	bool bmi2 = bmi160_init(CS2_PIN, S2_GYRO_RANGE_REG);
+	printk("BMI160 S1(%ddps)=%d S2(%ddps)=%d\n",
+	       CONFIG_GYRO_MOUSE_S1_RANGE, bmi1,
+	       CONFIG_GYRO_MOUSE_S2_RANGE, bmi2);
 
-	calibrate_gyro();
+#if CONFIG_GYRO_MOUSE_HARDCODED_CAL
+		cal_s1x = CONFIG_GYRO_MOUSE_CAL_S1X;
+		cal_s1y = CONFIG_GYRO_MOUSE_CAL_S1Y;
+		cal_s1z = CONFIG_GYRO_MOUSE_CAL_S1Z;
+		cal_s2x = CONFIG_GYRO_MOUSE_CAL_S2X;
+		cal_s2y = CONFIG_GYRO_MOUSE_CAL_S2Y;
+		cal_s2z = CONFIG_GYRO_MOUSE_CAL_S2Z;
+		printk("Using hardcoded gyro calibration\n");
+#elif CONFIG_GYRO_MOUSE_CALIBRATE_ON_BOOT
+		calibrate_gyro();
+#else
+		printk("Gyro calibration disabled, using zero offsets\n");
+#endif
 
 	printk("Exp10: Dual-gyro HID mouse running at 250Hz\n");
 	printk("tick\tFX\tFY\tFZ\tCH0\tCH1\tCH2\tCH3\n");
@@ -444,14 +507,25 @@ int main(void)
 		next_tick += TICK_PERIOD_MS;
 		tick_count++;
 
-		float fx, fy, fz;
+		float fx = 0, fy = 0, fz = 0;
+
+#if CONFIG_GYRO_MOUSE_ENABLE
 		read_fuse_gyro(&fx, &fy, &fz);
 
-		mouse_acc_x += apply_hssnf(fx * GYRO_SENS);
-		mouse_acc_y += apply_hssnf(fy * GYRO_SENS);
+#if CONFIG_GYRO_MOUSE_SWAP_AXES
+		float mx = fy, my = fx;
+#else
+		float mx = fx, my = fy;
+#endif
 
-		if (fast_fabs(mouse_acc_x) < 0.5f) mouse_acc_x = 0.0f;
-		if (fast_fabs(mouse_acc_y) < 0.5f) mouse_acc_y = 0.0f;
+		mouse_acc_x += apply_hssnf(mx * GYRO_SENS);
+		mouse_acc_y += apply_hssnf(my * GYRO_SENS);
+
+		if (DEADZONE_THR > 0.0f) {
+			if (fast_fabs(mouse_acc_x) < DEADZONE_THR) mouse_acc_x = 0.0f;
+			if (fast_fabs(mouse_acc_y) < DEADZONE_THR) mouse_acc_y = 0.0f;
+		}
+#endif
 
 		int dx = (int)mouse_acc_x;
 		int dy = (int)mouse_acc_y;

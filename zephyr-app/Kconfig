@@ -1,0 +1,181 @@
+menu "Gyro Mouse Configuration"
+
+config GYRO_MOUSE_ENABLE
+	bool "Enable gyro mouse"
+	default y
+	help
+	  Master enable for gyro-controlled mouse cursor.
+
+config GYRO_MOUSE_SWAP_AXES
+	bool "Swap gyro X/Y mapping to mouse"
+	default n
+	help
+	  When enabled: gyro X -> mouse Y, gyro Y -> mouse X.
+
+menu "Sensor Hardware"
+	depends on GYRO_MOUSE_ENABLE
+
+config GYRO_MOUSE_SPI_FREQ
+	int "SPI bus frequency (Hz)"
+	default 8000000
+	range 1000000 10000000
+
+config GYRO_MOUSE_CS1_PIN
+	int "Sensor 1 chip-select pin"
+	default 31
+	range 0 31
+
+config GYRO_MOUSE_CS2_PIN
+	int "Sensor 2 chip-select pin"
+	default 29
+	range 0 31
+
+config GYRO_MOUSE_S1_RANGE
+	int "Sensor 1 gyro range (dps)"
+	default 500
+	range 125 2000
+	help
+	  Options: 125, 250, 500, 1000, 2000.
+
+config GYRO_MOUSE_S2_RANGE
+	int "Sensor 2 gyro range (dps)"
+	default 125
+	range 125 2000
+
+config GYRO_MOUSE_ODR
+	int "Gyro/Accel output data rate (Hz)"
+	default 1600
+	range 25 1600
+	help
+	  Options: 25, 50, 100, 200, 400, 800, 1600.
+
+endmenu
+
+menu "Sampling & Timing"
+	depends on GYRO_MOUSE_ENABLE
+
+config GYRO_MOUSE_BURST_HIGH
+	int "Burst samples/tick for high-range sensor"
+	default 16
+	range 1 256
+
+config GYRO_MOUSE_BURST_LOW
+	int "Burst samples/tick for low-range sensor"
+	default 112
+	range 1 256
+
+config GYRO_MOUSE_TICK_PERIOD_MS
+	int "Main loop period (ms)"
+	default 4
+	range 1 100
+	help
+	  4ms = 250Hz, 10ms = 100Hz.
+
+endmenu
+
+menu "Mouse Sensitivity"
+	depends on GYRO_MOUSE_ENABLE
+
+config GYRO_MOUSE_SENSITIVITY_NUM
+	int "Sensitivity numerator"
+	default 1
+	range 1 10000
+	help
+	  Effective sensitivity = NUM / DENOM.  1/1000 = 0.001.
+
+config GYRO_MOUSE_SENSITIVITY_DENOM
+	int "Sensitivity denominator"
+	default 1000
+	range 1 10000
+
+config GYRO_MOUSE_DEADZONE
+	int "Accumulation deadzone threshold (x1000)"
+	default 500
+	range 0 2000
+	help
+	  500 = 0.5 pixels. Prevents drift from accumulated noise.
+
+endmenu
+
+menu "Filters"
+	depends on GYRO_MOUSE_ENABLE
+
+config GYRO_MOUSE_HSSNF_ENABLE
+	bool "Enable HSSNF non-linear filter"
+	default y
+
+config GYRO_MOUSE_HSSNF_T
+	int "HSSNF threshold t (x1000)"
+	default 1000
+	range 1 2000
+	depends on GYRO_MOUSE_HSSNF_ENABLE
+
+config GYRO_MOUSE_HSSNF_K
+	int "HSSNF curve k (x1000)"
+	default 500
+	range 1 999
+	depends on GYRO_MOUSE_HSSNF_ENABLE
+
+config GYRO_MOUSE_CROSSFADE_Z
+	int "Crossfade ramp_mid z (x1000)"
+	default 200
+	range 50 450
+	help
+	  200 = 0.2. Deadzone width in saturation-weighted crossfade.
+
+endmenu
+
+menu "Calibration"
+	depends on GYRO_MOUSE_ENABLE
+
+config GYRO_MOUSE_CALIBRATE_ON_BOOT
+	bool "Calibrate gyro offsets on every boot"
+	default y
+
+config GYRO_MOUSE_CAL_SAMPLES
+	int "Calibration sample count"
+	default 500
+	range 100 5000
+	depends on GYRO_MOUSE_CALIBRATE_ON_BOOT
+
+config GYRO_MOUSE_HARDCODED_CAL
+	bool "Use hardcoded calibration offsets (skip auto-cal)"
+	default n
+
+if GYRO_MOUSE_HARDCODED_CAL
+
+config GYRO_MOUSE_CAL_S1X
+	int "Sensor 1 (500dps) gyro X offset" default 0 range -32768 32767
+config GYRO_MOUSE_CAL_S1Y
+	int "Sensor 1 gyro Y offset" default 0 range -32768 32767
+config GYRO_MOUSE_CAL_S1Z
+	int "Sensor 1 gyro Z offset" default 0 range -32768 32767
+config GYRO_MOUSE_CAL_S2X
+	int "Sensor 2 (125dps) gyro X offset" default 0 range -32768 32767
+config GYRO_MOUSE_CAL_S2Y
+	int "Sensor 2 gyro Y offset" default 0 range -32768 32767
+config GYRO_MOUSE_CAL_S2Z
+	int "Sensor 2 gyro Z offset" default 0 range -32768 32767
+
+endif
+
+endmenu
+
+menu "Debug"
+	depends on GYRO_MOUSE_ENABLE
+
+config GYRO_MOUSE_ADC_DECIMATION
+	int "ADC read interval (ticks)"
+	default 25
+	range 1 1000
+	help
+	  25 ticks at 250Hz = 10Hz debug serial output.
+
+config GYRO_MOUSE_LED_DECIMATION
+	int "LED toggle interval (ticks)"
+	default 100
+	range 1 10000
+
+endmenu
+
+endmenu
