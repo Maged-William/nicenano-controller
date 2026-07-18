@@ -20,7 +20,7 @@ menu "Sensor Hardware"
 config GYRO_MOUSE_SPI_FREQ
 	int "SPI bus frequency (Hz)"
 	default 8000000
-	range 1000000 10000000
+	range 1000000 8000000
 
 config GYRO_MOUSE_CS1_PIN
 	int "Sensor 1 chip-select pin"
