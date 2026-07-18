@@ -145,17 +145,29 @@ config GYRO_MOUSE_HARDCODED_CAL
 if GYRO_MOUSE_HARDCODED_CAL
 
 config GYRO_MOUSE_CAL_S1X
-	int "Sensor 1 (500dps) gyro X offset" default 0 range -32768 32767
+	int "Sensor 1 (500dps) gyro X offset"
+	default 0
+	range -32768 32767
 config GYRO_MOUSE_CAL_S1Y
-	int "Sensor 1 gyro Y offset" default 0 range -32768 32767
+	int "Sensor 1 gyro Y offset"
+	default 0
+	range -32768 32767
 config GYRO_MOUSE_CAL_S1Z
-	int "Sensor 1 gyro Z offset" default 0 range -32768 32767
+	int "Sensor 1 gyro Z offset"
+	default 0
+	range -32768 32767
 config GYRO_MOUSE_CAL_S2X
-	int "Sensor 2 (125dps) gyro X offset" default 0 range -32768 32767
+	int "Sensor 2 (125dps) gyro X offset"
+	default 0
+	range -32768 32767
 config GYRO_MOUSE_CAL_S2Y
-	int "Sensor 2 gyro Y offset" default 0 range -32768 32767
+	int "Sensor 2 gyro Y offset"
+	default 0
+	range -32768 32767
 config GYRO_MOUSE_CAL_S2Z
-	int "Sensor 2 gyro Z offset" default 0 range -32768 32767
+	int "Sensor 2 gyro Z offset"
+	default 0
+	range -32768 32767
 
 endif
 
