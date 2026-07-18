@@ -8,10 +8,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: zephyr-app
-
     steps:
       - uses: actions/checkout@v4
 
@@ -42,23 +38,30 @@ jobs:
           wget -q https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu/12.2.rel1/binrel/arm-gnu-toolchain-12.2.rel1-x86_64-arm-none-eabi.tar.xz
           tar xf arm-gnu-toolchain-12.2.rel1-x86_64-arm-none-eabi.tar.xz
 
-      - name: Add ARM GCC to PATH
-        run: echo "$(pwd)/arm-gnu-toolchain-12.2.rel1-x86_64-arm-none-eabi/bin" >> $GITHUB_PATH
+      - name: Set up toolchain environment
+        run: |
+          echo "$(pwd)/arm-gnu-toolchain-12.2.rel1-x86_64-arm-none-eabi/bin" >> $GITHUB_PATH
+          echo "ZEPHYR_TOOLCHAIN_VARIANT=gnuarmemb" >> $GITHUB_ENV
+          echo "GNUARMEMB_TOOLCHAIN_PATH=$(pwd)/arm-gnu-toolchain-12.2.rel1-x86_64-arm-none-eabi" >> $GITHUB_ENV
 
       - name: Initialize & update west workspace
+        working-directory: zephyr-app
         run: |
           west init -l .
           west update
 
       - name: Export Zephyr CMake package
+        working-directory: zephyr-app
         run: west zephyr-export
 
       - name: Build firmware
+        working-directory: zephyr-app
         run: |
           west build -b nice_nano . -- \
             -DZEPHYR_EXTRA_MODULES=$PWD/module
 
       - name: Convert to UF2
+        working-directory: zephyr-app
         run: |
           wget -q https://raw.githubusercontent.com/microsoft/uf2/master/utils/uf2conv.py
           python3 uf2conv.py build/zephyr/zephyr.hex -c -f 0xADA52840 -o build/zephyr/zephyr.uf2
