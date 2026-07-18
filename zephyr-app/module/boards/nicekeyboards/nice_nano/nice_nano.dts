@@ -18,12 +18,6 @@
         zephyr,code-partition = &code_partition;
         zephyr,sram = &sram0;
         zephyr,flash = &flash0;
-        zephyr,console = &cdc_acm_uart0;
-    };
-
-    cdc_acm_uart0: cdc_acm_uart0 {
-        compatible = "zephyr,cdc-acm-uart";
-        zephyr,usb-device = &zephyr_udc0;
     };
 
     leds {
