@@ -447,8 +447,8 @@ int main(void)
 		float fx, fy, fz;
 		read_fuse_gyro(&fx, &fy, &fz);
 
-		mouse_acc_x += apply_hssnf(fy * GYRO_SENS);
-		mouse_acc_y += apply_hssnf(fx * GYRO_SENS);
+		mouse_acc_x += apply_hssnf(fx * GYRO_SENS);
+		mouse_acc_y += apply_hssnf(fy * GYRO_SENS);
 
 		if (fast_fabs(mouse_acc_x) < 0.5f) mouse_acc_x = 0.0f;
 		if (fast_fabs(mouse_acc_y) < 0.5f) mouse_acc_y = 0.0f;
