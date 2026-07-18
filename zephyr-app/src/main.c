@@ -6,9 +6,12 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/i2c.h>
 #include <zephyr/drivers/spi.h>
+#include <zephyr/drivers/flash.h>
+#include <zephyr/storage/flash_map.h>
 #include <zephyr/device.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 /* ================================================================
  * Constants
@@ -322,6 +325,58 @@ static void calibrate_gyro(void)
 }
 
 /* ================================================================
+ * Flash storage for calibration data
+ * ================================================================ */
+
+#define CAL_MAGIC  0xCA10BEEF
+
+struct cal_data {
+	uint32_t magic;
+	float s1x, s1y, s1z;
+	float s2x, s2y, s2z;
+};
+
+static int save_calibration(void)
+{
+	const struct flash_area *fa;
+	int err = flash_area_open(FLASH_AREA_ID(storage), &fa);
+	if (err) return err;
+
+	struct cal_data cal = {
+		.magic = CAL_MAGIC,
+		.s1x = cal_s1x, .s1y = cal_s1y, .s1z = cal_s1z,
+		.s2x = cal_s2x, .s2y = cal_s2y, .s2z = cal_s2z,
+	};
+
+	err = flash_area_erase(fa, 0, fa->fa_size);
+	if (err) { flash_area_close(fa); return err; }
+
+	err = flash_area_write(fa, 0, &cal, sizeof(cal));
+	flash_area_close(fa);
+	return err;
+}
+
+static int load_calibration(void)
+{
+	const struct flash_area *fa;
+	int err = flash_area_open(FLASH_AREA_ID(storage), &fa);
+	if (err) return err;
+
+	struct cal_data cal;
+	err = flash_area_read(fa, 0, &cal, sizeof(cal));
+	if (err || cal.magic != CAL_MAGIC) {
+		flash_area_close(fa);
+		return -1;
+	}
+
+	cal_s1x = cal.s1x; cal_s1y = cal.s1y; cal_s1z = cal.s1z;
+	cal_s2x = cal.s2x; cal_s2y = cal.s2y; cal_s2z = cal.s2z;
+
+	flash_area_close(fa);
+	return 0;
+}
+
+/* ================================================================
  * HID Mouse
  * ================================================================ */
 
@@ -430,7 +485,12 @@ int main(void)
 	bool bmi2 = bmi160_init(CS2_PIN, GYRO_RANGE_125);
 	printk("BMI160 S1(500dps)=%d S2(125dps)=%d\n", bmi1, bmi2);
 
-	calibrate_gyro();
+	if (load_calibration() == 0) {
+		printk("Loaded stored gyro calibration\n");
+	} else {
+		calibrate_gyro();
+		save_calibration();
+	}
 
 	printk("Exp10: Dual-gyro HID mouse running at 250Hz\n");
 	printk("tick\tFX\tFY\tFZ\tCH0\tCH1\tCH2\tCH3\n");
@@ -447,8 +507,8 @@ int main(void)
 		float fx, fy, fz;
 		read_fuse_gyro(&fx, &fy, &fz);
 
-		mouse_acc_x += apply_hssnf(fx * GYRO_SENS);
-		mouse_acc_y += apply_hssnf(fy * GYRO_SENS);
+		mouse_acc_x += apply_hssnf(fy * GYRO_SENS);
+		mouse_acc_y += apply_hssnf(fx * GYRO_SENS);
 
 		if (fast_fabs(mouse_acc_x) < 0.5f) mouse_acc_x = 0.0f;
 		if (fast_fabs(mouse_acc_y) < 0.5f) mouse_acc_y = 0.0f;
