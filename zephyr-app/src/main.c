@@ -7,11 +7,9 @@
 #include <zephyr/drivers/i2c.h>
 #include <zephyr/drivers/spi.h>
 #include <zephyr/drivers/flash.h>
-#include <zephyr/storage/flash_map.h>
 #include <zephyr/device.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <string.h>
 
 /* ================================================================
  * Constants
@@ -328,7 +326,9 @@ static void calibrate_gyro(void)
  * Flash storage for calibration data
  * ================================================================ */
 
-#define CAL_MAGIC  0xCA10BEEF
+#define CAL_MAGIC     0xCA10BEEF
+#define STORAGE_OFFS  0xec000
+#define FLASH_PAGE_SZ 4096
 
 struct cal_data {
 	uint32_t magic;
@@ -338,9 +338,8 @@ struct cal_data {
 
 static int save_calibration(void)
 {
-	const struct flash_area *fa;
-	int err = flash_area_open(FLASH_AREA_ID(storage_partition), &fa);
-	if (err) return err;
+	const struct device *flash_dev = DEVICE_DT_GET(DT_NODELABEL(flash0));
+	if (!device_is_ready(flash_dev)) return -1;
 
 	struct cal_data cal = {
 		.magic = CAL_MAGIC,
@@ -348,31 +347,24 @@ static int save_calibration(void)
 		.s2x = cal_s2x, .s2y = cal_s2y, .s2z = cal_s2z,
 	};
 
-	err = flash_area_erase(fa, 0, fa->fa_size);
-	if (err) { flash_area_close(fa); return err; }
+	int err = flash_erase(flash_dev, STORAGE_OFFS, FLASH_PAGE_SZ);
+	if (err) return err;
 
-	err = flash_area_write(fa, 0, &cal, sizeof(cal));
-	flash_area_close(fa);
-	return err;
+	return flash_write(flash_dev, STORAGE_OFFS, &cal, sizeof(cal));
 }
 
 static int load_calibration(void)
 {
-	const struct flash_area *fa;
-	int err = flash_area_open(FLASH_AREA_ID(storage_partition), &fa);
-	if (err) return err;
+	const struct device *flash_dev = DEVICE_DT_GET(DT_NODELABEL(flash0));
+	if (!device_is_ready(flash_dev)) return -1;
 
 	struct cal_data cal;
-	err = flash_area_read(fa, 0, &cal, sizeof(cal));
-	if (err || cal.magic != CAL_MAGIC) {
-		flash_area_close(fa);
-		return -1;
-	}
+	int err = flash_read(flash_dev, STORAGE_OFFS, &cal, sizeof(cal));
+	if (err || cal.magic != CAL_MAGIC) return -1;
 
 	cal_s1x = cal.s1x; cal_s1y = cal.s1y; cal_s1z = cal.s1z;
 	cal_s2x = cal.s2x; cal_s2y = cal.s2y; cal_s2z = cal.s2z;
 
-	flash_area_close(fa);
 	return 0;
 }
 
