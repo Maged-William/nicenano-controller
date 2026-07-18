@@ -62,12 +62,6 @@ jobs:
           west build -b nice_nano . -- \
             -DZEPHYR_EXTRA_MODULES=$PWD/module
 
-      - name: Convert to UF2
-        working-directory: zephyr-app
-        run: |
-          wget -q https://raw.githubusercontent.com/microsoft/uf2/master/utils/uf2conv.py
-          python3 uf2conv.py build/zephyr/zephyr.hex -c -f 0xADA52840 -o build/zephyr/zephyr.uf2
-
       - name: Upload UF2 artifact
         uses: actions/upload-artifact@v4
         with:
