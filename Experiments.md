@@ -9,4 +9,4 @@
 | Exp05 | ⚠️ Partial | Automated flashing via serial bootloader command — serial command works, bootloader enters DFU mode, but MSC drive doesn't enumerate after GPREGRET reset (only after double-tap) |
 | Exp06 | ✅ Complete | Zephyr RTOS v4.1 — Hello World via GitHub Actions CI, UF2 output, serial monitor verification |
 | Exp07 | ✅ Complete | USB HID Mouse — synthetic rectangle motion (100×100) via Zephyr, CDC ACM + HID composite |
-| Exp08 | 🔄 In Progress | ADS1015 joystick reading via I2C — port from PlatformIO to Zephyr RTOS |
+| Exp08 | ✅ Complete | ADS1015 joystick reading via I2C — port from PlatformIO to Zephyr RTOS |
