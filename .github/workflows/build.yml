@@ -22,8 +22,8 @@ jobs:
             gcc gcc-multilib g++-multilib \
             libsdl2-dev libmagic1 wget unzip
 
-      - name: Install west
-        run: pip3 install west
+      - name: Install Python deps
+        run: pip3 install west pyelftools
 
       - name: Cache ARM GCC toolchain
         id: cache-arm-gcc
@@ -50,9 +50,11 @@ jobs:
           west init -l .
           west update
 
-      - name: Export Zephyr CMake package
+      - name: Export Zephyr CMake package & install Python deps
         working-directory: zephyr-app
-        run: west zephyr-export
+        run: |
+          west zephyr-export
+          pip3 install -r ../zephyr/scripts/requirements.txt
 
       - name: Build firmware
         working-directory: zephyr-app
