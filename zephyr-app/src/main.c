@@ -339,7 +339,7 @@ struct cal_data {
 static int save_calibration(void)
 {
 	const struct flash_area *fa;
-	int err = flash_area_open(FLASH_AREA_ID(storage), &fa);
+	int err = flash_area_open(FLASH_AREA_ID(storage_partition), &fa);
 	if (err) return err;
 
 	struct cal_data cal = {
@@ -359,7 +359,7 @@ static int save_calibration(void)
 static int load_calibration(void)
 {
 	const struct flash_area *fa;
-	int err = flash_area_open(FLASH_AREA_ID(storage), &fa);
+	int err = flash_area_open(FLASH_AREA_ID(storage_partition), &fa);
 	if (err) return err;
 
 	struct cal_data cal;
