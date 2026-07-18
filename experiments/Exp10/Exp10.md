@@ -86,9 +86,14 @@ ADS1015 (4 channels, every 25th tick) → serial debug
 - ✅ **Burst averaging** — 128 total samples (16 high + 112 low) per tick provides noise reduction
 - ✅ **Saturation-weighted crossfade** — `ramp_mid(weight, 0.2)` smoothly blends between low-range precision and high-range headroom
 - ✅ **HSSNF filter** — Schlick-bias curve amplifies small movements, improving fine cursor control feel
+- ✅ **Startup calibration** — 500-sample stationary offset measurement subtracts gyro bias, eliminating drift at rest
+- ✅ **Accumulation deadzone** — Sub-0.5 pixel threshold prevents residual noise from accumulating into cursor movement
 - ✅ **Float accumulation** — Fractional pixel values accumulate between ticks, sub-pixel precision preserved
-- ✅ **250Hz loop** — After fixing the next_tick initialization to post-init, loop runs at consistent 250Hz
+- ✅ **250Hz loop** — `next_tick` properly initialized after init phase; consistent 250Hz
 - ✅ **ADS1015 preserved** — Joystick channels continue to stream for debug alongside gyro data
+- ✅ **Full Kconfig exposure** — All 30+ tunable parameters exposed as `CONFIG_GYRO_MOUSE_*` symbols in `zephyr-app/Kconfig`
+- ✅ **Axis swap** — Configurable via `CONFIG_GYRO_MOUSE_SWAP_AXES`
+- ✅ **Hardcoded calibration** — `CONFIG_GYRO_MOUSE_HARDCODED_CAL` + six per-sensor per-axis offset values, bypasses auto-cal
 
 ### What Was Fixed
 
@@ -96,10 +101,35 @@ ADS1015 (4 channels, every 25th tick) → serial debug
 |-----|-----------|-----|
 | **Loop running at >1000Hz** | `next_tick` captured before ~2s of init code → deadline always in past → sleep skipped | Moved `next_tick = k_uptime_get()` to right before `while(1)` |
 | **Wrong register addresses** | `BMI160_ACCEL_CONF` mapped to 0x41 (actually 0x40), `BMI160_GYRO_CONF` mapped to 0x43 (actually 0x42) | Corrected to 0x40 and 0x42; range writes go to 0x41 and 0x43 |
+| **Gyro drift at rest** | Static bias offset (~20–30 counts) accumulated in mouse float → reached ±1 px → cursor drifted | Startup calibration (500 samples) + accumulation deadzone (0.5 px) |
+| **Turn-ratio mismatch** | User expected gyro X→mouse X, gyro Y→mouse Y | Removed accidental swap, then added `CONFIG_GYRO_MOUSE_SWAP_AXES` toggle |
+
+### Kconfig Structure
+
+```
+zephyr-app/Kconfig (source "Kconfig.zephyr" + custom menu)
+├── GYRO_MOUSE_ENABLE               # Master toggle
+├── GYRO_MOUSE_SWAP_AXES            # Axis swap
+├── Sensor Hardware                  # SPI freq, CS pins, ranges, ODR
+├── Sampling & Timing                # Burst counts, tick period
+├── Mouse Sensitivity                # NUM/DENOM, deadzone
+├── Filters                          # HSSNF enable/t/k, crossfade z
+├── Calibration                      # Auto-cal, sample count, hardcoded offsets
+└── Debug                            # ADC/LED decimation
+```
+
+All floats represented as int ×1000 (e.g., `CROSSFADE_Z` range 50–450 = 0.05–0.45). Gyro range and ODR are human-readable (125, 500, 1600…) with `#elif` chains converting to BMI160 register values.
 
 ### Build Time
 
 | Run | Time | Notes |
 |-----|------|-------|
-| First build (fix Kconfig) | 4m 55s | Failed on undefined CONFIG_PRINTK_FMT_FLOAT |
-| Second build (Kconfig fix) | 5m 35s | Clean build, UF2 artifact uploaded |
+| First Kconfig attempt | 4m 55s | Failed — `CONFIG_PRINTK_FMT_FLOAT` undefined |
+| Kconfig fix | 5m 35s | Clean build |
+| Register fix + cal | 5m 11s | Added burst averaging, startup calibration, deadzone |
+| Flash persistence | 6m 01s | Failed — linker error `__device_dts_ord_73` |
+| Final (Kconfig exposure) | 6m 11s | Clean build, all 30+ options exposed |
+
+### Outstanding
+
+- **Flash persistence** — Saving calibration offsets to the `storage_partition` (0xEC000) failed with a linker error (`__device_dts_ord_73` — the nRF52 flash driver device ordinal wasn't resolved). This requires adding `CONFIG_SOC_FLASH_NRF=y` and using `DT_CHOSEN(zephyr_flash)` for the device binding. Worth revisiting in a follow-up experiment.
