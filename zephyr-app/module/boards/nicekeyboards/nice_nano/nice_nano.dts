@@ -23,6 +23,7 @@
 
     cdc_acm_uart0: cdc_acm_uart0 {
         compatible = "zephyr,cdc-acm-uart";
+        zephyr,usb-device = &zephyr_udc0;
     };
 
     leds {
