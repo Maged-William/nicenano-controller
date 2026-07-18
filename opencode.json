@@ -1,3 +1,9 @@
 {
-  "allowedDirectories": ["G:\\", "C:\\Users\\MW\\.platformio\\*"]
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "external_directory": {
+      "G:/**": "allow",
+      "C:/Users/MW/.platformio/**": "allow"
+    }
+  }
 }
