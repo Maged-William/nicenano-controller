@@ -61,7 +61,7 @@ static int scan_adc(void)
 	return 0;
 }
 
-void main(void)
+int main(void)
 {
 	const struct device *cdc = DEVICE_DT_GET(DT_NODELABEL(cdc_acm_uart0));
 	const struct device *gpio0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
@@ -118,4 +118,6 @@ void main(void)
 
 		k_sleep(K_MSEC(100));
 	}
+
+	return 0;
 }
