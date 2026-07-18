@@ -4,6 +4,7 @@
 
 void main(void)
 {
+    k_sleep(K_MSEC(500));
     usb_enable(NULL);
 
     while (1) {
