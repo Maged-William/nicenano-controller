@@ -8,6 +8,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: zephyr-app
+
     steps:
       - uses: actions/checkout@v4
 
@@ -50,7 +54,9 @@ jobs:
         run: west zephyr-export
 
       - name: Build firmware
-        run: west build -b nice_nano .
+        run: |
+          west build -b nice_nano . -- \
+            -DZEPHYR_EXTRA_MODULES=$PWD/module
 
       - name: Convert to UF2
         run: |
@@ -61,4 +67,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: firmware-uf2
-          path: build/zephyr/zephyr.uf2
+          path: zephyr-app/build/zephyr/zephyr.uf2

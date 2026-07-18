@@ -3,14 +3,13 @@ experiments/*/firmware/.pio/
 experiments/*/firmware/firmware.uf2
 firmware.uf2
 
-# Zephyr build artifacts
-build/
-.build/
-zephyr/
-modules/
-bootloader/
-tools/
-.west/
+# Zephyr workspace artifacts (created by west update)
+zephyr-app/zephyr/
+zephyr-app/modules/
+zephyr-app/bootloader/
+zephyr-app/tools/
+zephyr-app/.west/
+zephyr-app/build/
 
 # Downloaded CI builds
 builds/

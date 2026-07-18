@@ -6,19 +6,27 @@ Zephyr RTOS v4.1 can be set up as a standalone build targeting the nice!nano nRF
 
 ## Execution Plan
 
-1. **Source code** — Create a minimal Zephyr application at the repo root:
-   - `west.yml` — Zephyr manifest pointing to v4.1.0
+1. **Source code** — Create a minimal Zephyr application at `zephyr-app/`:
+   - `west.yml` — Zephyr manifest pointing to `zmkfirmware/zephyr` v4.1.0+zmk-fixes fork (includes nice_nano board)
    - `CMakeLists.txt` — App entry for Zephyr build system
    - `src/main.c` — Infinite loop with `printk("Hello World from Zephyr!\n")` every 3 seconds
+   - `module/boards/nicekeyboards/nice_nano/` — Out-of-tree board definition for nice!nano (based on ZMK's definition)
+     - `board.yml` — HWMv2 board metadata (vendor: nicekeyboards, SoC: nrf52840, revs: 1.0.0/2.0.0)
+     - `Kconfig.nice_nano` — Selects SOC_NRF52840_QIAA
+     - `nice_nano.dts` — Devicetree (USBD, I2C0, SPI1, partitions)
+     - `nice_nano-pinctrl.dtsi` — Pin control: I2C=SDA:P0.17/SCL:P0.20, SPI=SCK:P0.06/MOSI:P0.08/MISO:P0.02
+     - `nice_nano_2_0_0_defconfig` — Board defaults (MPU, pinctrl, GPIO, UF2 output)
+     - `board.cmake` — Runner config for nrfjprog/UF2
 
 2. **GitHub Actions CI** — Create `.github/workflows/build.yml`:
+   - All west commands run in `zephyr-app/` directory
    - Install system deps (cmake, ninja, Python, etc.)
    - Download ARM GCC toolchain 12.2
    - `pip install west`
-   - `west init -l . && west update` — fetch Zephyr v4.1 + modules
-   - `west build -b nice_nano .` — build the app
-   - Convert `zephyr.hex` → `zephyr.uf2` via `uf2conv.py`
-   - Upload UF2 as a build artifact
+   - `west init -l . && west update` — fetch Zephyr + modules
+   - `west build -b nice_nano . -- -DZEPHYR_EXTRA_MODULES=$PWD/module` — build with out-of-tree board
+   - Convert `build/zephyr/zephyr.hex` → `zephyr.uf2` via `uf2conv.py`
+   - Upload UF2 as build artifact
 
 3. **Dev loop** — Write code → commit & push → wait for action → download artifact via `gh` CLI → flash via existing Leonardo automation
 
