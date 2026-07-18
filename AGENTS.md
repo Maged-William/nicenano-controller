@@ -1,13 +1,13 @@
 # Rules
 
+- Be autonomous, don't inturrupt the flow.
+- Never ask the user to read the serial monitor, you the Assistant should read it, use Putty, most likely you want COM27 115200.
 - Don't scan other projects or folders outside this folder.
-- Never visit any other folder unless it's `G:/` to copy uf2 to.
 - We are starting Fresh, ignore any other attempts in other folders.
 
 # Background
 
-Using a nice nano V2 nrf52840 microcontroller, i want to test an i2c ADC module, the module is either ADS1015 or ADS1115, 12-bit or 16-bit, i need to identify it.
-
+Using a nice nano V2 nrf52840 microcontroller, i have an i2c ADC module ADS1015 12-bit, and 2 BMI160 sensors over SPI.
 
 # Wiring
 
@@ -30,10 +30,35 @@ The following is how im currently wiring things:
 | GND | GND | GND |
 | VCC | VCC | VCC |
 
+| BMI160 Sensor 1 Pin | BMI160 Sensor 2 Pin | nice!nano V2 | Pin Function Description |
+| --- | --- | --- | --- |
+| 3V3 | 3V3 | 3V3 | Power (3.3V) |
+| GND | GND | GND | Ground |
+| SCL | SCL | P0.06 | SPI Clock (SCK) |
+| SDA | SDA | P0.08 | SPI Data In (MOSI) |
+| SA0 | SA0 | P0.02 | SPI Data Out (MISO) |
+| CS | Leave separate | P0.30 | CS for Sensor 1 |
+| Leave separate | CS | P0.29 | CS for Sensor 2 |
+
+Leonardo pin 9 → 1kΩ → NPN base, NPN collector → nice!nano RST, emitter → GND (common ground).
+
+**Find the Leonardo COM port:**
+```
+Get-PnpDevice -Class Ports | Select-Object FriendlyName, Class, InstanceId
+```
+Look for `Arduino Leonardo (COMx)`. If multiple are connected, send `x` to each and listen for the `"Reset helper ready"` response.
+
+
 # Development
 
 Use the following repo to develop for the nicenano nrf52 supermini clone:
 https://github.com/ICantMakeThings/Nicenano-NRF52-Supermini-PlatformIO-Support
+
+## The dev loop:
+
+As long as you havent reached the desired outcome, keep on looping, only the user will break this and ask about your status.
+
+Write the Code -> build it -> Send 'b' to Leonardo -> copy the firmware to the nicenano -> using Putty inspect the serial monitor
 
 
 # Building & Flashing
@@ -69,9 +94,12 @@ The `.uf2` is saved to the project root.
 
 ## Flashing
 
-Double-tap RST with GND to enter bootloader, then copy `firmware.uf2` to the `NICENANO` drive (`G:/`).
+The nicenano require a Double-tap RST with GND to enter bootloader, But to make it autonomous, we are using the Arduino Leonardo with an NPN transistor and a 1kohm to short the RST and GND on command.
+simply detect the leonardo and send 'b' and wait 3 seconds it should be in bootloader mode at (`G:/`) drive.
 
-> side quest: Invest in making this autonomous
+Then copy `firmware.uf2` to the `NICENANO` drive (`G:/`).
+
+If you the nicenano stuck send 'r' to the leonardo it will send one pulse hence reseting the nicenano
 
 # Experiments
 
@@ -89,9 +117,9 @@ Update the Experiment documents with your hypothesis, execution plan, Success Cr
 
 When the experiment is done, Commit any uncommited changes, update the experiment document with your conclusion, update Experiments.md status.
 
-# Success
 
-You are successful when you have:
-1. program and flashed the nicenano v2 using Arduino or PlatformIO
-2. Identified the ADC.
-3. Live reading from the joystick.
+# Resources
+
+- https://github.com/inputlabs/alpakka_firmware/tree/main/src
+- https://github.com/ICantMakeThings/Nicenano-NRF52-Supermini-PlatformIO-Support
+- https://github.com/hanyazou/BMI160-Arduino
