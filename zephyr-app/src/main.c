@@ -74,6 +74,10 @@ static const struct spi_config spi_cfg = {
 static float mouse_acc_x;
 static float mouse_acc_y;
 
+/* Gyro calibration offsets (subtracted from raw readings) */
+static float cal_s1x, cal_s1y, cal_s1z;
+static float cal_s2x, cal_s2y, cal_s2z;
+
 /* ================================================================
  * Math helpers
  * ================================================================ */
@@ -220,7 +224,8 @@ static bool bmi160_init(gpio_pin_t cs, uint8_t gyro_range)
 }
 
 /* Read gyro X/Y/Z only (6 bytes, registers 0x0C–0x11) via burst */
-static void bmi160_read_gyro(gpio_pin_t cs, float *gx, float *gy, float *gz)
+static void bmi160_read_gyro(gpio_pin_t cs, float *gx, float *gy, float *gz,
+			     float ox, float oy, float oz)
 {
 	uint8_t tx_data[7] = { BMI160_DATA_8 | 0x80 };
 	uint8_t rx_data[7] = { 0 };
@@ -237,9 +242,9 @@ static void bmi160_read_gyro(gpio_pin_t cs, float *gx, float *gy, float *gz)
 	int16_t y = (int16_t)(rx_data[4] << 8 | rx_data[3]);
 	int16_t z = (int16_t)(rx_data[6] << 8 | rx_data[5]);
 
-	*gx = (float)x;
-	*gy = (float)y;
-	*gz = (float)z;
+	*gx = (float)x - ox;
+	*gy = (float)y - oy;
+	*gz = (float)z - oz;
 }
 
 /* ================================================================
@@ -253,7 +258,8 @@ static void read_fuse_gyro(float *fx, float *fy, float *fz)
 	float tmp_x, tmp_y, tmp_z;
 
 	for (int i = 0; i < BURST_HIGH; i++) {
-		bmi160_read_gyro(CS1_PIN, &tmp_x, &tmp_y, &tmp_z);
+		bmi160_read_gyro(CS1_PIN, &tmp_x, &tmp_y, &tmp_z,
+				 cal_s1x, cal_s1y, cal_s1z);
 		gx_h += tmp_x;
 		gy_h += tmp_y;
 		gz_h += tmp_z;
@@ -263,7 +269,8 @@ static void read_fuse_gyro(float *fx, float *fy, float *fz)
 	gz_h /= (float)BURST_HIGH;
 
 	for (int i = 0; i < BURST_LOW; i++) {
-		bmi160_read_gyro(CS2_PIN, &tmp_x, &tmp_y, &tmp_z);
+		bmi160_read_gyro(CS2_PIN, &tmp_x, &tmp_y, &tmp_z,
+				 cal_s2x, cal_s2y, cal_s2z);
 		gx_l += tmp_x;
 		gy_l += tmp_y;
 		gz_l += tmp_z;
@@ -281,6 +288,37 @@ static void read_fuse_gyro(float *fx, float *fy, float *fz)
 	*fx = gx_h * w_high + (gx_l / 4.0f) * w_low;
 	*fy = gy_h * w_high + (gy_l / 4.0f) * w_low;
 	*fz = gz_h * w_high + (gz_l / 4.0f) * w_low;
+}
+
+/* ================================================================
+ * Gyro calibration (stationary offset measurement)
+ * ================================================================ */
+
+#define CAL_SAMPLES  500
+
+static void calibrate_gyro(void)
+{
+	float sx1 = 0, sy1 = 0, sz1 = 0;
+	float sx2 = 0, sy2 = 0, sz2 = 0;
+	float tx, ty, tz;
+
+	printk("Calibrating gyro (hold still)... ");
+	for (int i = 0; i < CAL_SAMPLES; i++) {
+		bmi160_read_gyro(CS1_PIN, &tx, &ty, &tz, 0, 0, 0);
+		sx1 += tx; sy1 += ty; sz1 += tz;
+		bmi160_read_gyro(CS2_PIN, &tx, &ty, &tz, 0, 0, 0);
+		sx2 += tx; sy2 += ty; sz2 += tz;
+		k_busy_wait(4000);
+	}
+
+	cal_s1x = sx1 / (float)CAL_SAMPLES;
+	cal_s1y = sy1 / (float)CAL_SAMPLES;
+	cal_s1z = sz1 / (float)CAL_SAMPLES;
+	cal_s2x = sx2 / (float)CAL_SAMPLES;
+	cal_s2y = sy2 / (float)CAL_SAMPLES;
+	cal_s2z = sz2 / (float)CAL_SAMPLES;
+
+	printk("done\n");
 }
 
 /* ================================================================
@@ -392,6 +430,8 @@ int main(void)
 	bool bmi2 = bmi160_init(CS2_PIN, GYRO_RANGE_125);
 	printk("BMI160 S1(500dps)=%d S2(125dps)=%d\n", bmi1, bmi2);
 
+	calibrate_gyro();
+
 	printk("Exp10: Dual-gyro HID mouse running at 250Hz\n");
 	printk("tick\tFX\tFY\tFZ\tCH0\tCH1\tCH2\tCH3\n");
 
@@ -409,6 +449,9 @@ int main(void)
 
 		mouse_acc_x += apply_hssnf(fx * GYRO_SENS);
 		mouse_acc_y += apply_hssnf(fy * GYRO_SENS);
+
+		if (fast_fabs(mouse_acc_x) < 0.5f) mouse_acc_x = 0.0f;
+		if (fast_fabs(mouse_acc_y) < 0.5f) mouse_acc_y = 0.0f;
 
 		int dx = (int)mouse_acc_x;
 		int dy = (int)mouse_acc_y;
