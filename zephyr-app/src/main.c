@@ -275,13 +275,6 @@ static bool tps43_poll(int16_t *dx, int16_t *dy, bool *tap)
 	return tps43_regs[TPS43_FINGER_COUNT - TPS43_GESTURE0] > 0;
 }
 
-static float tps43_map_v(int16_t d)
-{
-	float a = (float)(d > 0 ? d : -d);
-	float sign = (d > 0) ? 1.0f : -1.0f;
-	return sign * (a * a / 512.0f);
-}
-
 #endif /* CONFIG_TPS43_ENABLE */
 
 /* ================================================================
@@ -554,15 +547,23 @@ int main(void)
 #if CONFIG_TPS43_ENABLE
 	{
 		uint8_t end_cmd[3] = { 0xEE, 0xEE, 0x00 };
+		uint8_t reg_ptr[2] = { 0x00, TPS43_GESTURE0 };
+		uint8_t test_buf[2];
+
 		i2c_write(i2c_dev, end_cmd, 3, TPS43_ADDR);
 		k_sleep(K_MSEC(100));
+
 		tps43_found = false;
 		for (int retry = 0; retry < 5; retry++) {
-			if (i2c_write(i2c_dev, NULL, 0, TPS43_ADDR) == 0) {
+			if (i2c_write_read(i2c_dev, TPS43_ADDR, reg_ptr, 2, test_buf, 1) == 0) {
 				tps43_found = true;
 				break;
 			}
+			i2c_write(i2c_dev, end_cmd, 3, TPS43_ADDR);
 			k_sleep(K_MSEC(200));
+		}
+		if (tps43_found) {
+			i2c_write(i2c_dev, end_cmd, 3, TPS43_ADDR);
 		}
 		printk("TPS43 touchpad: %s\n", tps43_found ? "found" : "not found");
 	}
@@ -633,8 +634,8 @@ int main(void)
 			tps43_dbg_dy = tdy;
 			tps43_dbg_fingers = touched ? tps43_regs[TPS43_FINGER_COUNT - TPS43_GESTURE0] : 0;
 			if (touched) {
-				float mv_x = tps43_map_v(tdx) * TPS43_SENS;
-				float mv_y = tps43_map_v(tdy) * TPS43_SENS;
+				float mv_x = (float)tdx * TPS43_SENS;
+				float mv_y = (float)tdy * TPS43_SENS;
 #if CONFIG_TPS43_INVERT_X
 				mv_x = -mv_x;
 #endif

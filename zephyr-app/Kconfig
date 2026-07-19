@@ -224,16 +224,16 @@ config TPS43_ENABLE
 
 config TPS43_SENSITIVITY_NUM
 	int "Touchpad sensitivity numerator"
-	default 1
+	default 5
 	range 1 100
 	depends on TPS43_ENABLE
 	help
-	  Effective sensitivity = NUM / DENOM. Mapped touchpad delta is multiplied
-	  by this factor before adding to the mouse accumulator. 1/1 = 1:1.
+	  Effective sensitivity = NUM / DENOM. Raw touchpad delta is multiplied
+	  by this factor before adding to the mouse accumulator. 5/1 = 5x.
 
 config TPS43_SENSITIVITY_DENOM
 	int "Touchpad sensitivity denominator"
-	default 2
+	default 1
 	range 1 100
 	depends on TPS43_ENABLE
 
