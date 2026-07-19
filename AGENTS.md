@@ -21,7 +21,7 @@ The following is how im currently wiring things:
 | P0.20 | SCL | I2C Clock |
 | float | ADDR | I2C Address |
 
-| ADC | joystick A | joystick B |
+| i2c ADC | joystick A | joystick B |
 | --- | --- | --- |
 | A0 | X | |
 | A1 | Y | |
@@ -29,6 +29,13 @@ The following is how im currently wiring things:
 | A3 | | Y |
 | GND | GND | GND |
 | VCC | VCC | VCC |
+
+| nice!nano pin  | i2c Azoteq TPS43 |
+| --- | --- |
+| P0.17 | SDA |
+| P0.20 | SCL |
+| GND | GND |
+| VCC | VCC |
 
 | BMI160 Sensor 1 Pin | BMI160 Sensor 2 Pin | nice!nano V2 | Pin Function Description |
 | --- | --- | --- | --- |
@@ -148,3 +155,6 @@ When the experiment is done, Commit any uncommited changes, update the experimen
 - https://github.com/inputlabs/alpakka_firmware/tree/main/src
 - https://github.com/ICantMakeThings/Nicenano-NRF52-Supermini-PlatformIO-Support
 - https://github.com/hanyazou/BMI160-Arduino
+- https://github.com/thedalles77/USB_Laptop_Keyboard_Controller/blob/master/Example_Touchpads/Azoteq_TP.ino
+- https://github.com/ilp0/qmk_firmware/blob/master/keyboards/disconnect72/IQS5xx.c
+- https://github.com/rwalkr/eskarp/blob/main/firmware/device/src/touchpad.rs
