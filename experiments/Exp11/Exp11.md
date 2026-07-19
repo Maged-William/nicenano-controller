@@ -63,33 +63,57 @@ menu "TPS43 Touchpad"
 
 ## Build Results
 
-| Run | Time | Result |
-|-----|------|--------|
-| CI build (Exp11) | 4m 38s | ✅ Clean build, UF2 artifact |
+| Run | Time | Result | Commit |
+|-----|------|--------|--------|
+| Initial build | 4m 38s | ✅ Clean build | 8caadd0 |
+| Linear raw scaling + sensitivity | 5m 17s | ✅ Clean build | 51f1e3d |
+| Halve sensitivity to 2.5x | 5m 58s | ✅ Clean build | 060c983 |
+| Gesture debug + 2-finger scroll + wheel | 5m 16s | ✅ Clean build | 2d93bda |
+| Scroll sensitivity + horizontal wheel | 5m 56s | ✅ Clean build | 9c0effb |
+| Scroll divider (60) | 5m 26s | ✅ Clean build | c5804ff |
 
-## Serial Output Verification
+### Features implemented (all working)
+
+| Feature | How |
+|---------|-----|
+| Linear raw × sensitivity | Removed quadratic curve, raw delta × `NUM/DENOM` (default 5/2 = 2.5x) |
+| 2-finger vertical scroll | Y delta → vertical wheel, divided by `SCROLL_DIVIDER` (60) |
+| 2-finger horizontal scroll | X delta → horizontal wheel (AC Pan HID usage) |
+| Independent scroll sensitivity | `SCROLL_SENS_NUM/DENOM` (default 2/1 = 2x) separate from cursor |
+| 5-byte HID report | buttons, X, Y, wheel V, wheel H |
+| Tap-to-click | Gesture0 bit 0 → left click |
+| Gesture debug | `GST g0=0xXX g1=0xYY f=N` serial output on gesture change |
+
+### Attempted but reverted: Tap-and-drag FSM
+
+A libinput-inspired state machine (`IDLE→TOUCHING→HELD→ACTIVE`) with absolute position tracking was implemented across 7 commits but ultimately reverted due to:
+- **Init instability**: Changed from `i2c_write_read` to `i2c_write(NULL)` probe — TPS43 stopped being detected on boot
+- **Absolute position unreliability**: TPS43 absolute X/Y registers didn't update reliably enough for movement threshold detection
+- **Complexity**: The combined FSM + absolute position tracking made the touchpad non-functional
+
+## Serial Output Verification (final working build)
 
 ```
 *** Booting Zephyr OS build v4.1.0 ***
-No ADC found
-TPS43 touchpad: not found
+ADC at 0x48
+ADS1015 (12-bit)
+TPS43 touchpad: found
 BMI160 S1(500dps)=1 S2(125dps)=1
 Calibrating gyro (hold still)... done
 Exp11: Dual-gyro HID mouse + TPS43 touchpad at 250Hz
 tick  FX  FY  FZ  CH0  CH1  CH2  CH3  TP_X  TP_Y  TP_F
-25   -2  -1  -3  0    0    0    0    0     0     0
-50    0   2  -1  0    0    0    0    0     0     0
-...
 ```
 
 ## Success Criteria
 
-- [x] Firmware builds on GitHub Actions, produces UF2 (4m 38s)
+- [x] Firmware builds on GitHub Actions, produces UF2
 - [x] Serial output shows TPS43 columns (TP_X, TP_Y, TP_F finger count)
-- [ ] Cursor responds to both gyro + touchpad (requires TPS43 hardware connected)
-- [ ] Tap-to-click works (requires TPS43 hardware)
-- [ ] ADS1015 debug at ~10Hz (not found this run — CH0-3 all 0, ADC not connected)
-- [x] LED heartbeat at ~2.5Hz (visible on board)
+- [x] Cursor responds to both gyro + touchpad
+- [x] Tap-to-click works
+- [x] ADS1015 debug at ~10Hz
+- [x] LED heartbeat at ~2.5Hz
+- [x] 2-finger scroll (vertical + horizontal)
+- [x] Configurable cursor and scroll sensitivity via Kconfig
 
 ## Challenges
 
@@ -97,15 +121,20 @@ tick  FX  FY  FZ  CH0  CH1  CH2  CH3  TP_X  TP_Y  TP_F
 - **I2C bus sharing** — TPS43 + ADS1015 on same I2C bus; ensure no transaction conflicts
 - **End Communication Window** — must be sent after every read or touchpad stops responding
 - **Combined gyro+touchpad** — both inputs feed the same accumulator; tuning needed to avoid fighting
+- **Init reliability** — TPS43 requires `i2c_write_read` (not just addr probe) to wake up; timeout must be generous
+- **Absolute position not reliable** — TPS43 abs X/Y registers don't track well enough for position-based drag detection
 
 ## Conclusion
 
-**Hypothesis validated.** The TPS43 driver integrates cleanly with the existing dual-gyro HID mouse and ADS1015 debug infrastructure:
-- TPS43 detection via I2C probe at `0x74` works correctly
-- Driver code compiles and is properly guarded by `CONFIG_TPS43_ENABLE`
-- Touchpad deltas flow into the same `mouse_acc_x/y` accumulator as gyro
-- Tap gesture maps to left mouse button with edge detection
-- All 6 Kconfig options work with default values
-- No impact on existing gyro fusion or loop timing when TPS43 is not connected
+**Hypothesis validated.** The TPS43 touchpad driver integrates cleanly with the existing dual-gyro HID mouse and ADS1015 debug infrastructure:
+- TPS43 detection via `i2c_write_read` at `0x74` with 5 retries
+- 16-bit relative X/Y deltas → linear raw × configurable sensitivity → `mouse_acc_x/y` accumulator
+- Tap gesture (gesture0 bit 0) → left mouse button with edge detection
+- 2-finger scrolling with independent sensitivity, both vertical and horizontal axes
+- 14 Kconfig options covering enable, cursor sensitivity, scroll sensitivity, scroll divider, axis invert, tap enable, debug
+- Horizontal wheel via Consumer page AC Pan HID usage (5-byte report)
+- No impact on existing gyro fusion or loop timing
 
-**Not yet verified with real hardware:** TPS43 not connected during this session. Actual touch movement and tap-click behavior require hardware testing.
+### What didn't work
+
+**Tap-and-drag** proved unreliable on this hardware. The TPS43 absolute X/Y registers don't track finger position consistently enough for position-delta-based drag detection, and altering the I2C init sequence from `i2c_write_read` to a simple probe broke detection entirely. A future experiment could revisit drag with a timer-only approach (no absolute position), or by using relative delta integration to track movement from tap origin.
