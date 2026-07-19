@@ -237,6 +237,20 @@ config TPS43_SENSITIVITY_DENOM
 	range 1 100
 	depends on TPS43_ENABLE
 
+config TPS43_SCROLL_SENS_NUM
+	int "Scroll sensitivity numerator"
+	default 2
+	range 1 100
+	depends on TPS43_ENABLE
+	help
+	  Effective scroll sensitivity = NUM / DENOM. 2/1 = 2x.
+
+config TPS43_SCROLL_SENS_DENOM
+	int "Scroll sensitivity denominator"
+	default 1
+	range 1 100
+	depends on TPS43_ENABLE
+
 config TPS43_INVERT_X
 	bool "Invert touchpad X axis"
 	default n

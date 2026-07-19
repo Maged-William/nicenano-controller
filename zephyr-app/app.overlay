@@ -2,7 +2,7 @@
 	hid0: hid {
 		compatible = "zephyr,hid-device";
 		protocol-code = "mouse";
-		in-report-size = <4>;
+		in-report-size = <5>;
 		in-polling-period-us = <4000>;
 	};
 };

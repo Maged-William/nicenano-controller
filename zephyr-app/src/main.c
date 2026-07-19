@@ -122,6 +122,7 @@ static const struct spi_config spi_cfg = {
 static float mouse_acc_x;
 static float mouse_acc_y;
 static int mouse_wheel;
+static int mouse_wheel_h;
 static uint8_t mouse_buttons;
 
 /* Gyro calibration offsets (subtracted from raw readings) */
@@ -238,6 +239,7 @@ static int scan_adc(void)
 #if CONFIG_TPS43_ENABLE
 
 #define TPS43_SENS  ((float)CONFIG_TPS43_SENSITIVITY_NUM / (float)CONFIG_TPS43_SENSITIVITY_DENOM)
+#define TPS43_SCROLL_SENS  ((float)CONFIG_TPS43_SCROLL_SENS_NUM / (float)CONFIG_TPS43_SCROLL_SENS_DENOM)
 
 static bool tps43_found;
 static uint8_t tps43_regs[16];
@@ -475,13 +477,20 @@ static const uint8_t hid_report_desc[] = {
 	0x75, 0x08,        /*     Report Size (8) */
 	0x95, 0x01,        /*     Report Count (1) */
 	0x81, 0x06,        /*     Input (Data,Var,Rel) */
+	0x05, 0x0C,        /*     Usage Page (Consumer) */
+	0x0A, 0x38, 0x02,  /*     Usage (AC Pan) */
+	0x15, 0x81,        /*     Logical Minimum (-127) */
+	0x25, 0x7F,        /*     Logical Maximum (127) */
+	0x75, 0x08,        /*     Report Size (8) */
+	0x95, 0x01,        /*     Report Count (1) */
+	0x81, 0x06,        /*     Input (Data,Var,Rel) */
 	0xC0,              /*   End Collection */
 	0xC0               /* End Collection */
 };
 
-static void send_mouse_report(int8_t dx, int8_t dy, int8_t w)
+static void send_mouse_report(int8_t dx, int8_t dy, int8_t w, int8_t wh)
 {
-	uint8_t report[4] = { mouse_buttons, (uint8_t)dx, (uint8_t)dy, (uint8_t)w };
+	uint8_t report[5] = { mouse_buttons, (uint8_t)dx, (uint8_t)dy, (uint8_t)w, (uint8_t)wh };
 	hid_int_ep_write(hid_dev, report, sizeof(report), NULL);
 }
 
@@ -650,7 +659,8 @@ int main(void)
 
 			if (touched) {
 				if (fingers >= 2) {
-					mouse_wheel += (int)tdy * (int)(TPS43_SENS * 2.0f);
+					mouse_wheel   += (int)((float)tdy * TPS43_SCROLL_SENS);
+					mouse_wheel_h += (int)((float)tdx * TPS43_SCROLL_SENS);
 				} else {
 					float mv_x = (float)tdx * TPS43_SENS;
 					float mv_y = (float)tdy * TPS43_SENS;
@@ -693,7 +703,12 @@ int main(void)
 		if (w < -128) w = -128;
 		mouse_wheel -= w;
 
-		send_mouse_report((int8_t)dx, (int8_t)dy, (int8_t)w);
+		int wh = mouse_wheel_h;
+		if (wh > 127) wh = 127;
+		if (wh < -128) wh = -128;
+		mouse_wheel_h -= wh;
+
+		send_mouse_report((int8_t)dx, (int8_t)dy, (int8_t)w, (int8_t)wh);
 
 		if (tick_count % ADC_DECIMATION == 0) {
 			int16_t ch0 = adc_read_channel(0);
