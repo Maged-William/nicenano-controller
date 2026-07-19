@@ -512,10 +512,14 @@ int main(void)
 #if CONFIG_GYRO_MOUSE_ENABLE
 		read_fuse_gyro(&fx, &fy, &fz);
 
-#if CONFIG_GYRO_MOUSE_SWAP_AXES
-		float mx = fy, my = fx;
-#else
-		float mx = fx, my = fy;
+		float gyro_v[3] = { fx, fy, fz };
+		float mx = gyro_v[CONFIG_GYRO_MOUSE_X_SOURCE];
+		float my = gyro_v[CONFIG_GYRO_MOUSE_Y_SOURCE];
+#if CONFIG_GYRO_MOUSE_X_INVERT
+		mx = -mx;
+#endif
+#if CONFIG_GYRO_MOUSE_Y_INVERT
+		my = -my;
 #endif
 
 		mouse_acc_x += apply_hssnf(mx * GYRO_SENS);

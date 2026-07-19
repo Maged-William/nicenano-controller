@@ -8,11 +8,25 @@ config GYRO_MOUSE_ENABLE
 	help
 	  Master enable for gyro-controlled mouse cursor.
 
-config GYRO_MOUSE_SWAP_AXES
-	bool "Swap gyro X/Y mapping to mouse"
-	default n
+config GYRO_MOUSE_X_SOURCE
+	int "Gyro axis for mouse X (0=X, 1=Y, 2=Z)"
+	default 0
+	range 0 2
 	help
-	  When enabled: gyro X -> mouse Y, gyro Y -> mouse X.
+	  0=gyro X, 1=gyro Y, 2=gyro Z.
+
+config GYRO_MOUSE_X_INVERT
+	bool "Invert mouse X axis"
+	default n
+
+config GYRO_MOUSE_Y_SOURCE
+	int "Gyro axis for mouse Y (0=X, 1=Y, 2=Z)"
+	default 1
+	range 0 2
+
+config GYRO_MOUSE_Y_INVERT
+	bool "Invert mouse Y axis"
+	default n
 
 menu "Sensor Hardware"
 	depends on GYRO_MOUSE_ENABLE
