@@ -552,8 +552,20 @@ int main(void)
 	}
 
 #if CONFIG_TPS43_ENABLE
-	tps43_found = (i2c_write(i2c_dev, NULL, 0, TPS43_ADDR) == 0);
-	printk("TPS43 touchpad: %s\n", tps43_found ? "found" : "not found");
+	{
+		uint8_t end_cmd[3] = { 0xEE, 0xEE, 0x00 };
+		i2c_write(i2c_dev, end_cmd, 3, TPS43_ADDR);
+		k_sleep(K_MSEC(100));
+		tps43_found = false;
+		for (int retry = 0; retry < 5; retry++) {
+			if (i2c_write(i2c_dev, NULL, 0, TPS43_ADDR) == 0) {
+				tps43_found = true;
+				break;
+			}
+			k_sleep(K_MSEC(200));
+		}
+		printk("TPS43 touchpad: %s\n", tps43_found ? "found" : "not found");
+	}
 #endif
 
 	bool bmi1 = bmi160_init(CS1_PIN, S1_GYRO_RANGE_REG);
