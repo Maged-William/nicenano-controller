@@ -551,6 +551,14 @@ int main(void)
 		printk(sum_lsb == 0 ? "ADS1015 (12-bit)\n" : "ADS1115 (16-bit)\n");
 	}
 
+	printk("I2C scan:");
+	for (int addr = 1; addr < 128; addr++) {
+		if (i2c_write(i2c_dev, NULL, 0, addr) == 0) {
+			printk(" 0x%02X", addr);
+		}
+	}
+	printk("\n");
+
 #if CONFIG_TPS43_ENABLE
 	tps43_found = (i2c_write(i2c_dev, NULL, 0, TPS43_ADDR) == 0);
 	printk("TPS43 touchpad: %s\n", tps43_found ? "found" : "not found");
