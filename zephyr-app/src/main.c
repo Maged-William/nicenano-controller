@@ -121,6 +121,7 @@ static const struct spi_config spi_cfg = {
 
 static float mouse_acc_x;
 static float mouse_acc_y;
+static int mouse_wheel;
 static uint8_t mouse_buttons;
 
 /* Gyro calibration offsets (subtracted from raw readings) */
@@ -245,6 +246,9 @@ static bool tps43_left_btn_prev;
 static int16_t tps43_dbg_dx;
 static int16_t tps43_dbg_dy;
 static uint8_t tps43_dbg_fingers;
+static uint8_t tps43_prev_g0;
+static uint8_t tps43_prev_g1;
+static uint8_t tps43_prev_fingers;
 
 static int tps43_read_block(uint8_t *buf)
 {
@@ -475,9 +479,9 @@ static const uint8_t hid_report_desc[] = {
 	0xC0               /* End Collection */
 };
 
-static void send_mouse_report(int8_t dx, int8_t dy)
+static void send_mouse_report(int8_t dx, int8_t dy, int8_t w)
 {
-	uint8_t report[4] = { mouse_buttons, (uint8_t)dx, (uint8_t)dy, 0 };
+	uint8_t report[4] = { mouse_buttons, (uint8_t)dx, (uint8_t)dy, (uint8_t)w };
 	hid_int_ep_write(hid_dev, report, sizeof(report), NULL);
 }
 
@@ -632,18 +636,33 @@ int main(void)
 			bool touched = tps43_poll(&tdx, &tdy, &tap);
 			tps43_dbg_dx = tdx;
 			tps43_dbg_dy = tdy;
-			tps43_dbg_fingers = touched ? tps43_regs[TPS43_FINGER_COUNT - TPS43_GESTURE0] : 0;
+			uint8_t g0 = tps43_regs[0];
+			uint8_t g1 = tps43_regs[1];
+			uint8_t fingers = tps43_regs[TPS43_FINGER_COUNT - TPS43_GESTURE0];
+			tps43_dbg_fingers = touched ? fingers : 0;
+
+			if (g0 != tps43_prev_g0 || g1 != tps43_prev_g1 || fingers != tps43_prev_fingers) {
+				printk("GST g0=0x%02X g1=0x%02X f=%d\n", g0, g1, fingers);
+				tps43_prev_g0 = g0;
+				tps43_prev_g1 = g1;
+				tps43_prev_fingers = fingers;
+			}
+
 			if (touched) {
-				float mv_x = (float)tdx * TPS43_SENS;
-				float mv_y = (float)tdy * TPS43_SENS;
+				if (fingers >= 2) {
+					mouse_wheel += (int)tdy * (int)(TPS43_SENS * 2.0f);
+				} else {
+					float mv_x = (float)tdx * TPS43_SENS;
+					float mv_y = (float)tdy * TPS43_SENS;
 #if CONFIG_TPS43_INVERT_X
-				mv_x = -mv_x;
+					mv_x = -mv_x;
 #endif
 #if CONFIG_TPS43_INVERT_Y
-				mv_y = -mv_y;
+					mv_y = -mv_y;
 #endif
-				mouse_acc_x += mv_x;
-				mouse_acc_y += mv_y;
+					mouse_acc_x += mv_x;
+					mouse_acc_y += mv_y;
+				}
 			}
 #if CONFIG_TPS43_TAP_ENABLE
 			tps43_left_btn = tap;
@@ -669,7 +688,12 @@ int main(void)
 		if (dy > 127) dy = 127;
 		if (dy < -128) dy = -128;
 
-		send_mouse_report((int8_t)dx, (int8_t)dy);
+		int w = mouse_wheel;
+		if (w > 127) w = 127;
+		if (w < -128) w = -128;
+		mouse_wheel -= w;
+
+		send_mouse_report((int8_t)dx, (int8_t)dy, (int8_t)w);
 
 		if (tick_count % ADC_DECIMATION == 0) {
 			int16_t ch0 = adc_read_channel(0);
