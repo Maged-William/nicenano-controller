@@ -12,4 +12,4 @@
 | Exp08 | ✅ Complete | ADS1015 joystick reading via I2C — port from PlatformIO to Zephyr RTOS |
 | Exp09 | ✅ Complete | BMI160 gyro + accel over SPI — port from PlatformIO to Zephyr RTOS |
 | Exp10 | ✅ Complete | Dual-gyro HID mouse via saturation-weighted crossfade — Alpakka-style fusion with burst averaging, startup calibration, deadzone, 30+ Kconfigs |
-| Exp11 | 🔄 In Progress | TPS43 touchpad integration — Azoteq TPS43 on I2C alongside ADS1015 + dual-gyro mouse |
+| Exp11 | ✅ Complete | TPS43 touchpad integration — Azoteq TPS43 on I2C alongside ADS1015 + dual-gyro mouse |
