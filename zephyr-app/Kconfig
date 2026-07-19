@@ -214,4 +214,53 @@ config GYRO_MOUSE_DTR_TIMEOUT_MS
 
 endmenu
 
+menu "TPS43 Touchpad"
+
+config TPS43_ENABLE
+	bool "Enable TPS43 touchpad"
+	default y
+	help
+	  Master enable for Azoteq TPS43 capacitive touchpad on I2C (addr 0x74).
+
+config TPS43_SENSITIVITY_NUM
+	int "Touchpad sensitivity numerator"
+	default 1
+	range 1 100
+	depends on TPS43_ENABLE
+	help
+	  Effective sensitivity = NUM / DENOM. Mapped touchpad delta is multiplied
+	  by this factor before adding to the mouse accumulator. 1/1 = 1:1.
+
+config TPS43_SENSITIVITY_DENOM
+	int "Touchpad sensitivity denominator"
+	default 2
+	range 1 100
+	depends on TPS43_ENABLE
+
+config TPS43_INVERT_X
+	bool "Invert touchpad X axis"
+	default n
+	depends on TPS43_ENABLE
+
+config TPS43_INVERT_Y
+	bool "Invert touchpad Y axis"
+	default n
+	depends on TPS43_ENABLE
+
+config TPS43_TAP_ENABLE
+	bool "Enable tap-to-click"
+	default y
+	depends on TPS43_ENABLE
+	help
+	  When enabled, a tap gesture on the touchpad sends left mouse button click.
+
+config TPS43_DEBUG
+	bool "Print touchpad register dump on every tick"
+	default n
+	depends on TPS43_ENABLE
+	help
+	  Prints all 16 register bytes from the TPS43 for debugging.
+
+endmenu
+
 endmenu

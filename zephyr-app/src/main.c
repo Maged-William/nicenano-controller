@@ -121,6 +121,7 @@ static const struct spi_config spi_cfg = {
 
 static float mouse_acc_x;
 static float mouse_acc_y;
+static uint8_t mouse_buttons;
 
 /* Gyro calibration offsets (subtracted from raw readings) */
 static float cal_s1x, cal_s1y, cal_s1z;
@@ -210,6 +211,78 @@ static int scan_adc(void)
 	}
 	return 0;
 }
+
+/* ================================================================
+ * TPS43 Touchpad (I2C)
+ * ================================================================ */
+
+#define TPS43_ADDR         0x74
+#define TPS43_GESTURE0     0x0D
+#define TPS43_GESTURE1     0x0E
+#define TPS43_SYS_INFO0    0x0F
+#define TPS43_SYS_INFO1    0x10
+#define TPS43_FINGER_COUNT 0x11
+#define TPS43_XREL_HIGH    0x12
+#define TPS43_XREL_LOW     0x13
+#define TPS43_YREL_HIGH    0x14
+#define TPS43_YREL_LOW     0x15
+#define TPS43_XABS_HIGH    0x16
+#define TPS43_XABS_LOW     0x17
+#define TPS43_YABS_HIGH    0x18
+#define TPS43_YABS_LOW     0x19
+#define TPS43_STRENGTH_HIGH 0x1A
+#define TPS43_STRENGTH_LOW  0x1B
+#define TPS43_TOUCH_AREA   0x1C
+
+#if CONFIG_TPS43_ENABLE
+
+#define TPS43_SENS  ((float)CONFIG_TPS43_SENSITIVITY_NUM / (float)CONFIG_TPS43_SENSITIVITY_DENOM)
+
+static bool tps43_found;
+static uint8_t tps43_regs[16];
+static bool tps43_left_btn;
+static bool tps43_left_btn_prev;
+static int16_t tps43_dbg_dx;
+static int16_t tps43_dbg_dy;
+static uint8_t tps43_dbg_fingers;
+
+static int tps43_read_block(uint8_t *buf)
+{
+	uint8_t reg_ptr[2] = { 0x00, TPS43_GESTURE0 };
+	return i2c_write_read(i2c_dev, TPS43_ADDR, reg_ptr, 2, buf, 16);
+}
+
+static int tps43_end_comm(void)
+{
+	uint8_t end_cmd[3] = { 0xEE, 0xEE, 0x00 };
+	return i2c_write(i2c_dev, end_cmd, 3, TPS43_ADDR);
+}
+
+static bool tps43_poll(int16_t *dx, int16_t *dy, bool *tap)
+{
+	if (tps43_read_block(tps43_regs) != 0) {
+		tps43_end_comm();
+		return false;
+	}
+	tps43_end_comm();
+
+	*dx = (int16_t)((tps43_regs[TPS43_XREL_HIGH - TPS43_GESTURE0] << 8) |
+	                tps43_regs[TPS43_XREL_LOW  - TPS43_GESTURE0]);
+	*dy = (int16_t)((tps43_regs[TPS43_YREL_HIGH - TPS43_GESTURE0] << 8) |
+	                tps43_regs[TPS43_YREL_LOW  - TPS43_GESTURE0]);
+	*tap = (tps43_regs[0] & 0x01) != 0;
+
+	return tps43_regs[TPS43_FINGER_COUNT - TPS43_GESTURE0] > 0;
+}
+
+static float tps43_map_v(int16_t d)
+{
+	float a = (float)(d > 0 ? d : -d);
+	float sign = (d > 0) ? 1.0f : -1.0f;
+	return sign * (a * a / 512.0f);
+}
+
+#endif /* CONFIG_TPS43_ENABLE */
 
 /* ================================================================
  * BMI160 SPI
@@ -409,9 +482,9 @@ static const uint8_t hid_report_desc[] = {
 	0xC0               /* End Collection */
 };
 
-static void send_mouse_move(int8_t dx, int8_t dy)
+static void send_mouse_report(int8_t dx, int8_t dy)
 {
-	uint8_t report[4] = { 0, (uint8_t)dx, (uint8_t)dy, 0 };
+	uint8_t report[4] = { mouse_buttons, (uint8_t)dx, (uint8_t)dy, 0 };
 	hid_int_ep_write(hid_dev, report, sizeof(report), NULL);
 }
 
@@ -478,6 +551,11 @@ int main(void)
 		printk(sum_lsb == 0 ? "ADS1015 (12-bit)\n" : "ADS1115 (16-bit)\n");
 	}
 
+#if CONFIG_TPS43_ENABLE
+	tps43_found = (i2c_write(i2c_dev, NULL, 0, TPS43_ADDR) == 0);
+	printk("TPS43 touchpad: %s\n", tps43_found ? "found" : "not found");
+#endif
+
 	bool bmi1 = bmi160_init(CS1_PIN, S1_GYRO_RANGE_REG);
 	bool bmi2 = bmi160_init(CS2_PIN, S2_GYRO_RANGE_REG);
 	printk("BMI160 S1(%ddps)=%d S2(%ddps)=%d\n",
@@ -498,8 +576,8 @@ int main(void)
 		printk("Gyro calibration disabled, using zero offsets\n");
 #endif
 
-	printk("Exp10: Dual-gyro HID mouse running at 250Hz\n");
-	printk("tick\tFX\tFY\tFZ\tCH0\tCH1\tCH2\tCH3\n");
+	printk("Exp11: Dual-gyro HID mouse + TPS43 touchpad at 250Hz\n");
+	printk("tick\tFX\tFY\tFZ\tCH0\tCH1\tCH2\tCH3\tTP_X\tTP_Y\tTP_F\n");
 
 	int64_t next_tick;
 	int tick_count = 0;
@@ -534,6 +612,40 @@ int main(void)
 		}
 #endif
 
+#if CONFIG_TPS43_ENABLE
+		if (tps43_found) {
+			int16_t tdx, tdy;
+			bool tap;
+			bool touched = tps43_poll(&tdx, &tdy, &tap);
+			tps43_dbg_dx = tdx;
+			tps43_dbg_dy = tdy;
+			tps43_dbg_fingers = touched ? tps43_regs[TPS43_FINGER_COUNT - TPS43_GESTURE0] : 0;
+			if (touched) {
+				float mv_x = tps43_map_v(tdx) * TPS43_SENS;
+				float mv_y = tps43_map_v(tdy) * TPS43_SENS;
+#if CONFIG_TPS43_INVERT_X
+				mv_x = -mv_x;
+#endif
+#if CONFIG_TPS43_INVERT_Y
+				mv_y = -mv_y;
+#endif
+				mouse_acc_x += mv_x;
+				mouse_acc_y += mv_y;
+			}
+#if CONFIG_TPS43_TAP_ENABLE
+			tps43_left_btn = tap;
+			if (tps43_left_btn != tps43_left_btn_prev) {
+				if (tps43_left_btn) {
+					mouse_buttons |= 1;
+				} else {
+					mouse_buttons &= ~1;
+				}
+				tps43_left_btn_prev = tps43_left_btn;
+			}
+#endif
+		}
+#endif
+
 		int dx = (int)mouse_acc_x;
 		int dy = (int)mouse_acc_y;
 		mouse_acc_x -= (float)dx;
@@ -544,16 +656,22 @@ int main(void)
 		if (dy > 127) dy = 127;
 		if (dy < -128) dy = -128;
 
-		send_mouse_move((int8_t)dx, (int8_t)dy);
+		send_mouse_report((int8_t)dx, (int8_t)dy);
 
 		if (tick_count % ADC_DECIMATION == 0) {
 			int16_t ch0 = adc_read_channel(0);
 			int16_t ch1 = adc_read_channel(1);
 			int16_t ch2 = adc_read_channel(2);
 			int16_t ch3 = adc_read_channel(3);
-			printk("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
+			printk("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
 			       tick_count, (int)fx, (int)fy, (int)fz,
-			       ch0, ch1, ch2, ch3);
+			       ch0, ch1, ch2, ch3,
+#if CONFIG_TPS43_ENABLE
+			       tps43_dbg_dx, tps43_dbg_dy, tps43_dbg_fingers
+#else
+			       0, 0, 0
+#endif
+			       );
 		}
 
 		if (tick_count % LED_DECIMATION == 0) {
