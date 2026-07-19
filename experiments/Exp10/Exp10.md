@@ -91,8 +91,9 @@ ADS1015 (4 channels, every 25th tick) → serial debug
 - ✅ **Float accumulation** — Fractional pixel values accumulate between ticks, sub-pixel precision preserved
 - ✅ **250Hz loop** — `next_tick` properly initialized after init phase; consistent 250Hz
 - ✅ **ADS1015 preserved** — Joystick channels continue to stream for debug alongside gyro data
-- ✅ **Full Kconfig exposure** — All 30+ tunable parameters exposed as `CONFIG_GYRO_MOUSE_*` symbols in `zephyr-app/Kconfig`
-- ✅ **Axis swap** — Configurable via `CONFIG_GYRO_MOUSE_SWAP_AXES`
+- ✅ **Full Kconfig exposure** — All 35+ tunable parameters exposed as `CONFIG_GYRO_MOUSE_*` symbols in `zephyr-app/Kconfig`
+- ✅ **Per-axis source + invert** — `X_SOURCE`, `Y_SOURCE`, `X_INVERT`, `Y_INVERT` for arbitrary gyro→mouse mappings
+- ✅ **DTR timeout** — `CONFIG_GYRO_MOUSE_DTR_TIMEOUT_MS` (default 0) skips serial wait, boots HID immediately on plug-in
 - ✅ **Hardcoded calibration** — `CONFIG_GYRO_MOUSE_HARDCODED_CAL` + six per-sensor per-axis offset values, bypasses auto-cal
 
 ### What Was Fixed
@@ -119,6 +120,28 @@ zephyr-app/Kconfig (source "Kconfig.zephyr" + custom menu)
 ```
 
 All floats represented as int ×1000 (e.g., `CROSSFADE_Z` range 50–450 = 0.05–0.45). Gyro range and ODR are human-readable (125, 500, 1600…) with `#elif` chains converting to BMI160 register values.
+
+### Per-Axis Source + Invert
+
+Replaced the simple `SWAP_AXES` bool with independent per-axis source and invert:
+
+```
+CONFIG_GYRO_MOUSE_X_SOURCE      # 0=X, 1=Y, 2=Z (default 0)
+CONFIG_GYRO_MOUSE_X_INVERT      # bool (default n)
+CONFIG_GYRO_MOUSE_Y_SOURCE      # 0=X, 1=Y, 2=Z (default 1)
+CONFIG_GYRO_MOUSE_Y_INVERT      # bool (default n)
+```
+
+This enables arbitrary mappings like **Z→mouse X, Y→-mouse Y**:
+```
+CONFIG_GYRO_MOUSE_X_SOURCE=2
+CONFIG_GYRO_MOUSE_Y_SOURCE=1
+CONFIG_GYRO_MOUSE_Y_INVERT=y
+```
+
+### DTR Timeout
+
+Added `CONFIG_GYRO_MOUSE_DTR_TIMEOUT_MS` (default `0`). When `0`, the mouse boots immediately without waiting for a serial terminal — no need to open Putty/Serial Monitor for the HID to work. When set to e.g. `5000`, waits up to 5s for a terminal to connect before proceeding anyway.
 
 ### Build Time
 
