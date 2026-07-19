@@ -453,10 +453,13 @@ int main(void)
 
 	usb_enable(NULL);
 
-	while (!dtr) {
+#if CONFIG_GYRO_MOUSE_DTR_TIMEOUT_MS > 0
+	int dtr_polls = CONFIG_GYRO_MOUSE_DTR_TIMEOUT_MS / 100;
+	while (!dtr && dtr_polls-- > 0) {
 		uart_line_ctrl_get(cdc, UART_LINE_CTRL_DTR, &dtr);
 		k_sleep(K_MSEC(100));
 	}
+#endif
 
 	k_sleep(K_SECONDS(1));
 
