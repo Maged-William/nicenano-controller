@@ -4,6 +4,9 @@
 - Never ask the user to read the serial monitor, you the Assistant should read it, use Putty, most likely you want COM30 115200.
 - Don't scan other projects or folders outside this folder.
 - We are starting Fresh, ignore any other attempts in other folders.
+- Always assume i want to flash, never ask if i want to flash, proceed
+- if i asked to flash an old firmware, download the artifact, do not re build it cost time.
+- Follow this document on how to flash
 
 # Background
 

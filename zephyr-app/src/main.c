@@ -184,9 +184,9 @@ int main(void)
 #endif
 
 #if CONFIG_TPS43_ENABLE
-		if (tps43_found) {
-			int16_t tdx, tdy;
-			bool tap;
+		{
+			int16_t tdx = 0, tdy = 0;
+			bool tap = false;
 			bool touched = tps43_poll(&tdx, &tdy, &tap);
 			tps43_dbg_dx = tdx;
 			tps43_dbg_dy = tdy;

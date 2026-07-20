@@ -1,4 +1,5 @@
 #include <zephyr/kernel.h>
+#include <zephyr/sys/printk.h>
 #include <zephyr/drivers/i2c.h>
 #include <zephyr/device.h>
 #include "tps43.h"
@@ -55,8 +56,26 @@ static int tps43_end_comm(void)
 
 bool tps43_poll(int16_t *dx, int16_t *dy, bool *tap)
 {
+	if (!tps43_found) {
+		uint8_t reg_ptr[2] = { 0x00, TPS43_GESTURE0 };
+		uint8_t test_buf[1];
+		tps43_end_comm();
+		if (i2c_write_read(i2c_dev, TPS43_ADDR, reg_ptr, 2, test_buf, 1) == 0) {
+			tps43_found = true;
+			printk("TPS43 touchpad: found (late init)\n");
+		}
+		tps43_end_comm();
+		*dx = 0;
+		*dy = 0;
+		*tap = false;
+		return false;
+	}
+
 	if (tps43_read_block(tps43_regs) != 0) {
 		tps43_end_comm();
+		*dx = 0;
+		*dy = 0;
+		*tap = false;
 		return false;
 	}
 	tps43_end_comm();
