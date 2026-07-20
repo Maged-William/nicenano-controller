@@ -7,6 +7,7 @@
 - Always assume i want to flash, never ask if i want to flash, proceed
 - if i asked to flash an old firmware, download the artifact, do not re build it cost time.
 - Follow this document on how to flash
+- Always Check The Serial Monitor (ACTSM) after every flash (no exceptions).
 
 # Background
 
