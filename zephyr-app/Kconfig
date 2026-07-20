@@ -299,6 +299,18 @@ config TPS43_DRAG_TIMEOUT_MS
 	  How long after a tap the user has to touch down again to start
 	  dragging (button stays held between tap and re-touch).
 
+config TPS43_DROP_GRACE_MS
+	int "Drop grace period (ms) — debounce against brief contact loss"
+	default 40
+	range 0 200
+	depends on TPS43_TAPDRAG_ENABLE
+	help
+	  When the finger lifts during a drag, the button stays held for
+	  this brief window. If the finger re-touches within this time,
+	  the drag continues. This prevents accidental drops when the
+	  TPS43 briefly loses contact (e.g. during fast swipes).
+	  0 = instant drop, no grace. 40ms is usually imperceptible.
+
 config TPS43_DRAGLOCK_ENABLE
 	bool "Enable drag lock (lift & re-touch to continue drag)"
 	default n
@@ -306,13 +318,14 @@ config TPS43_DRAGLOCK_ENABLE
 	help
 	  When enabled, lifting the finger mid-drag keeps the button held
 	  for DRAGLOCK_TIMEOUT_MS. Re-touching within that window continues
-	  the drag without releasing. Disabled = instant drop on lift.
+	  the drag without releasing. This is for intentional mid-drag
+	  repositioning, unlike DROP_GRACE_MS which is for debounce.
 
 config TPS43_DRAGLOCK_TIMEOUT_MS
 	int "Drag lock re-touch window (ms)"
 	default 300
 	range 50 1000
-	depends on TPS43_TAPDRAG_ENABLE
+	depends on TPS43_DRAGLOCK_ENABLE
 	help
 	  libinput default: 300ms. While dragging, if the finger lifts,
 	  this is how long the user has to touch down again to continue

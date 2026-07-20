@@ -9,6 +9,7 @@
 #define TAP_TIMEOUT_MS          CONFIG_TPS43_TAP_TIMEOUT_MS
 #define DRAG_TIMEOUT_MS        CONFIG_TPS43_DRAG_TIMEOUT_MS
 #define DRAGLOCK_TIMEOUT_MS    CONFIG_TPS43_DRAGLOCK_TIMEOUT_MS
+#define DROP_GRACE_MS          CONFIG_TPS43_DROP_GRACE_MS
 #define TAP_MOVE_THRESH        CONFIG_TPS43_TAP_MOVE_THRESH
 #define SAME_SPOT_THRESH       CONFIG_TPS43_SAME_SPOT_THRESH
 
@@ -43,6 +44,7 @@ static uint64_t tap_ms;
 static uint16_t tap_x;
 static uint16_t tap_y;
 static uint64_t lift_ms;
+static uint32_t drag_wait_timeout_ms;
 static bool button_down;
 
 static enum tap_state prev_state = 0xff;
@@ -239,15 +241,19 @@ bool tps43_tapdrag_update(bool finger_down, uint8_t finger_count,
 	 * ════════════════════════════════════════════════════════ */
 	case TAP_STATE_1FG_DRAGGING:
 		if (event == TAP_EVENT_RELEASE) {
-#ifdef CONFIG_TPS43_DRAGLOCK_ENABLE
 			lift_ms = now_ms;
-			state = TAP_STATE_1FG_DRAG_WAIT;
-			return true;
+#ifdef CONFIG_TPS43_DRAGLOCK_ENABLE
+			drag_wait_timeout_ms = DRAGLOCK_TIMEOUT_MS;
 #else
+			drag_wait_timeout_ms = DROP_GRACE_MS;
+#endif
+			if (drag_wait_timeout_ms > 0) {
+				state = TAP_STATE_1FG_DRAG_WAIT;
+				return true;
+			}
 			button_down = false;
 			state = TAP_STATE_IDLE;
 			return false;
-#endif
 		}
 		if (event == TAP_EVENT_TOUCH) {
 			return true;
@@ -258,12 +264,13 @@ bool tps43_tapdrag_update(bool finger_down, uint8_t finger_count,
 		return true;
 
 	/* ════════════════════════════════════════════════════════
-	 * 1FG_DRAG_WAIT — lift mid-drag, drag lock window
+	 * 1FG_DRAG_WAIT — lift mid-drag, wait for re-touch or timeout
+	 * timeout = DROP_GRACE_MS (default) or DRAGLOCK_TIMEOUT_MS
 	 * ════════════════════════════════════════════════════════ */
 	case TAP_STATE_1FG_DRAG_WAIT:
 		if (event == TAP_EVENT_TOUCH) {
 			uint32_t since_lift = (uint32_t)(now_ms - lift_ms);
-			if (since_lift <= DRAGLOCK_TIMEOUT_MS) {
+			if (since_lift <= drag_wait_timeout_ms) {
 				state = TAP_STATE_1FG_DRAGGING;
 				return true;
 			}
@@ -273,7 +280,7 @@ bool tps43_tapdrag_update(bool finger_down, uint8_t finger_count,
 		}
 		if (event == TAP_EVENT_TIMEOUT) {
 			uint32_t since_lift = (uint32_t)(now_ms - lift_ms);
-			if (since_lift > DRAGLOCK_TIMEOUT_MS) {
+			if (since_lift > drag_wait_timeout_ms) {
 				button_down = false;
 				state = TAP_STATE_IDLE;
 				return false;
