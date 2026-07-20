@@ -9,6 +9,7 @@ target_sources(app PRIVATE
     src/drivers/ads1015.c
     src/drivers/bmi160.c
     src/drivers/tps43.c
+    src/drivers/tps43_tapdrag.c
     src/alg/filter.c
     src/alg/calibrate.c
     src/alg/fusion.c
