@@ -335,6 +335,26 @@ config TPS43_DRAG_LOCK_TIMEOUT
 	  Timer3: how long the user has to re-touch after lifting mid-drag
 	  to continue dragging without releasing the button.
 
+config TPS43_FD_DEBOUNCE_TICKS
+	int "Finger-down debounce filter (ticks)"
+	default 3
+	range 1 10
+	depends on TPS43_TAPDRAG_ENABLE
+	help
+	  Number of consecutive identical samples before the finger-down
+	  signal is considered stable. Filters TPS43 finger-count glitches
+	  (e.g. when hardware tap fires mid-touch). At 250 Hz tick rate,
+	  3 ticks = 12 ms.
+
+config TPS43_ARM_MOVE_THRESH
+	int "Armed state move threshold (abs counts)"
+	default 3
+	range 1 100
+	depends on TPS43_TAPDRAG_ENABLE
+	help
+	  Minimum finger movement in ST_ARMED before the drag is confirmed
+	  (or cancelled, per CONFIRM_WINDOW logic). Lower = more sensitive.
+
 endmenu
 
 config TPS43_DEBUG
