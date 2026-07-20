@@ -1,6 +1,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/usb/class/usb_hid.h>
 #include <zephyr/device.h>
+#include <zephyr/sys/printk.h>
 #include "mouse.h"
 
 static const struct device *hid_dev;
@@ -63,5 +64,8 @@ void mouse_init(const struct device *dev)
 void send_mouse_report(int8_t dx, int8_t dy, int8_t w, int8_t wh)
 {
 	uint8_t report[5] = { mouse_buttons, (uint8_t)dx, (uint8_t)dy, (uint8_t)w, (uint8_t)wh };
-	hid_int_ep_write(hid_dev, report, sizeof(report), NULL);
+	int ret = hid_int_ep_write(hid_dev, report, sizeof(report), NULL);
+	if (ret != 0) {
+		printk("USB: hid write err %d\n", ret);
+	}
 }
