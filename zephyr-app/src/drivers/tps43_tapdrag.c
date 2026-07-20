@@ -7,68 +7,140 @@ enum drag_state {
 	ST_IDLE,
 	ST_TOUCH,
 	ST_TAP_WAIT,
+	ST_ARMED,
 	ST_DRAGGING,
 	ST_LOCK_WAIT,
 };
 
 static enum drag_state state;
-static uint64_t tap_up_ms;
 static uint64_t touch_start_ms;
+static uint64_t tap_up_ms;
+static uint64_t re_down_ms;
 static uint64_t lift_ms;
+static uint16_t tap_up_x;
+static uint16_t tap_up_y;
+static uint16_t last_x;
+static uint16_t last_y;
+static bool pos_cached;
+static bool click_pulse_done;
 
 void tps43_tapdrag_init(void)
 {
 	state = ST_IDLE;
+	pos_cached = false;
+	click_pulse_done = false;
 }
 
-bool tps43_tapdrag_update(bool finger_down, uint64_t now_ms)
+static inline uint32_t abs_diff(uint16_t a, uint16_t b)
+{
+	return a > b ? (uint32_t)(a - b) : (uint32_t)(b - a);
+}
+
+bool tps43_tapdrag_update(bool finger_down, uint16_t abs_x, uint16_t abs_y, uint64_t now_ms)
 {
 	switch (state) {
 
 	case ST_IDLE:
 		if (finger_down) {
 			touch_start_ms = now_ms;
+			last_x = abs_x;
+			last_y = abs_y;
+			pos_cached = true;
 			state = ST_TOUCH;
 		}
-		break;
+		return false;
 
 	case ST_TOUCH:
+		last_x = abs_x;
+		last_y = abs_y;
+		pos_cached = true;
+
 		if (!finger_down) {
 			if ((now_ms - touch_start_ms) <= CONFIG_TPS43_TAP_MAX_TIME) {
 				tap_up_ms = now_ms;
+				tap_up_x = last_x;
+				tap_up_y = last_y;
+				click_pulse_done = false;
 				state = ST_TAP_WAIT;
-			} else {
-				state = ST_IDLE;
+				return true;
 			}
+			state = ST_IDLE;
+			return false;
 		}
-		break;
+
+		if (abs_diff(last_x, abs_x) > CONFIG_TPS43_TAP_MOVE_THRESH ||
+		    abs_diff(last_y, abs_y) > CONFIG_TPS43_TAP_MOVE_THRESH) {
+			state = ST_IDLE;
+			return false;
+		}
+		return false;
 
 	case ST_TAP_WAIT:
-		if (finger_down) {
-			touch_start_ms = now_ms;
-			state = ST_DRAGGING;
-		} else if ((now_ms - tap_up_ms) > CONFIG_TPS43_REDOWN_WINDOW) {
-			state = ST_IDLE;
+		if (!click_pulse_done) {
+			click_pulse_done = true;
+			return false;
 		}
-		break;
+
+		if (finger_down) {
+			if (abs_diff(abs_x, tap_up_x) <= CONFIG_TPS43_SAME_SPOT_THRESH &&
+			    abs_diff(abs_y, tap_up_y) <= CONFIG_TPS43_SAME_SPOT_THRESH) {
+				re_down_ms = now_ms;
+				last_x = abs_x;
+				last_y = abs_y;
+				state = ST_ARMED;
+				return true;
+			}
+			state = ST_IDLE;
+			return false;
+		}
+
+		if ((now_ms - tap_up_ms) > CONFIG_TPS43_REDOWN_WINDOW) {
+			state = ST_IDLE;
+			return false;
+		}
+		return false;
+
+	case ST_ARMED:
+		if (!finger_down) {
+			state = ST_IDLE;
+			return false;
+		}
+
+		if (abs_x != last_x || abs_y != last_y) {
+			if ((now_ms - re_down_ms) <= CONFIG_TPS43_CONFIRM_WINDOW) {
+				last_x = abs_x;
+				last_y = abs_y;
+				state = ST_DRAGGING;
+				return true;
+			}
+			state = ST_IDLE;
+			return false;
+		}
+
+		last_x = abs_x;
+		last_y = abs_y;
+		return true;
 
 	case ST_DRAGGING:
 		if (!finger_down) {
 			lift_ms = now_ms;
 			state = ST_LOCK_WAIT;
 		}
-		break;
+		return true;
 
 	case ST_LOCK_WAIT:
 		if (finger_down) {
 			state = ST_DRAGGING;
-		} else if ((now_ms - lift_ms) > CONFIG_TPS43_DRAG_LOCK_TIMEOUT) {
-			state = ST_IDLE;
+			return true;
 		}
-		break;
+		if ((now_ms - lift_ms) > CONFIG_TPS43_DRAG_LOCK_TIMEOUT) {
+			state = ST_IDLE;
+			return false;
+		}
+		return true;
 	}
 
-	return state == ST_DRAGGING || state == ST_LOCK_WAIT;
+	return false;
 }
 
 #endif
