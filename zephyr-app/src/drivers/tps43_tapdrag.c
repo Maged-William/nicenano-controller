@@ -4,23 +4,37 @@
 
 #if CONFIG_TPS43_ENABLE && CONFIG_TPS43_TAPDRAG_ENABLE
 
+/* ─── libinput-tuned constants ───────────────────────────── */
+
 #define TAP_TIMEOUT_MS          CONFIG_TPS43_TAP_TIMEOUT_MS
 #define DRAG_TIMEOUT_MS        CONFIG_TPS43_DRAG_TIMEOUT_MS
 #define DRAGLOCK_TIMEOUT_MS    CONFIG_TPS43_DRAGLOCK_TIMEOUT_MS
-#define DROP_GRACE_MS          CONFIG_TPS43_DROP_GRACE_MS
 #define TAP_MOVE_THRESH        CONFIG_TPS43_TAP_MOVE_THRESH
 #define SAME_SPOT_THRESH       CONFIG_TPS43_SAME_SPOT_THRESH
-#define RELEASE_DEBOUNCE_MS    CONFIG_TPS43_RELEASE_DEBOUNCE_MS
+#define DRAGLOCK_ENABLE        CONFIG_TPS43_DRAGLOCK_ENABLE
+
+/* ─── FSM states (port of libinput evdev-mt-touchpad-tap.c) ─ */
 
 enum tap_state {
 	TAP_STATE_IDLE,
 	TAP_STATE_TOUCH,
+	TAP_STATE_TOUCH_2,
 	TAP_STATE_1FG_TAPPED,
-	TAP_STATE_1FG_DRAG_OR_DC,
 	TAP_STATE_1FG_DRAGGING,
 	TAP_STATE_1FG_DRAG_WAIT,
 	TAP_STATE_DEAD,
 };
+
+/* ─── Event types ─────────────────────────────────────────── */
+
+enum tap_event {
+	TAP_EVENT_TOUCH,
+	TAP_EVENT_RELEASE,
+	TAP_EVENT_MOTION,
+	TAP_EVENT_TIMEOUT,
+};
+
+/* ─── State ───────────────────────────────────────────────── */
 
 static enum tap_state state;
 static uint64_t touch_start_ms;
@@ -29,16 +43,13 @@ static uint16_t touch_start_y;
 static uint64_t tap_ms;
 static uint16_t tap_x;
 static uint16_t tap_y;
-static uint64_t re_down_ms;
-static uint16_t re_down_x;
-static uint16_t re_down_y;
 static uint64_t lift_ms;
-static uint32_t drag_wait_timeout_ms;
 static bool button_down;
 
 static enum tap_state prev_state = 0xff;
-static bool prev_was_touch;
-static uint64_t finger_lost_ms;
+static uint8_t prev_fg_count;
+
+/* ─── Helpers ─────────────────────────────────────────────── */
 
 static inline uint32_t abs_diff(uint16_t a, uint16_t b)
 {
@@ -50,71 +61,86 @@ static inline bool within_thresh(uint16_t a, uint16_t b, uint16_t thresh)
 	return abs_diff(a, b) <= thresh;
 }
 
+/* ─── API ─────────────────────────────────────────────────── */
+
 void tps43_tapdrag_init(void)
 {
 	state = TAP_STATE_IDLE;
 	button_down = false;
 	prev_state = 0xff;
-	prev_was_touch = false;
-	finger_lost_ms = 0;
+	prev_fg_count = 0xff;
 }
 
-bool tps43_tapdrag_update(bool finger_down, uint16_t abs_x, uint16_t abs_y, uint64_t now_ms,
-                          bool *double_click)
+bool tps43_tapdrag_update(bool finger_down, uint8_t finger_count,
+                          uint16_t abs_x, uint16_t abs_y, uint64_t now_ms,
+                          bool *right_click, bool *double_click)
 {
-	if (finger_down) {
-		finger_lost_ms = 0;
-	} else if (finger_lost_ms == 0) {
-		finger_lost_ms = now_ms;
-	}
-	if (!finger_down && finger_lost_ms > 0 &&
-	    (now_ms - finger_lost_ms) < RELEASE_DEBOUNCE_MS) {
-		finger_down = true;
-	}
+	enum tap_event event;
+	bool was_down = (prev_fg_count > 0);
+	uint8_t prev_fg = prev_fg_count;
+	prev_fg_count = finger_down ? finger_count : 0;
 
-	bool was_down = prev_was_touch;
-	prev_was_touch = finger_down;
-
+	if (right_click) *right_click = false;
 	if (double_click) *double_click = false;
 
-	enum { EV_TOUCH, EV_RELEASE, EV_MOTION, EV_TIMEOUT } event;
+	/* Determine event from finger state changes */
 	if (finger_down && !was_down) {
-		event = EV_TOUCH;
+		event = TAP_EVENT_TOUCH;
 	} else if (!finger_down && was_down) {
-		event = EV_RELEASE;
+		event = TAP_EVENT_RELEASE;
 	} else if (finger_down && was_down) {
-		event = EV_MOTION;
+		/* Check for finger count change */
+		if (finger_count != prev_fg) {
+			event = TAP_EVENT_TOUCH; /* treat count change as touch event */
+		} else {
+			event = TAP_EVENT_MOTION;
+		}
 	} else {
-		event = EV_TIMEOUT;
+		event = TAP_EVENT_TIMEOUT;
 	}
 
-	if (state != prev_state || event == EV_TOUCH || event == EV_RELEASE) {
-		static const char * const sn[] = {
-			"IDLE", "TOUCH", "TAPPED", "DC_DRAG", "DRAG", "DWAIT", "DEAD"
+	/* Debug log on state change */
+	if (state != prev_state || event == TAP_EVENT_TOUCH || event == TAP_EVENT_RELEASE) {
+		static const char * const state_names[] = {
+			"IDLE", "TOUCH", "TOUCH_2", "TAPPED", "DRAGGING", "DRAG_WAIT", "DEAD"
 		};
-		static const char * const en[] = {"TOUCH","RELEASE","MOTION","TIMEOUT"};
-		printk("TD: %s ev=%s fg=%d xy=%u,%u @%llu\n",
-		       sn[state], en[event], finger_down, abs_x, abs_y, now_ms);
+		static const char * const event_names[] = {
+			"TOUCH", "RELEASE", "MOTION", "TIMEOUT"
+		};
+		printk("TD: %s ev=%s fg=%d,%d xy=%u,%u @%llu\n",
+		       state_names[state], event_names[event],
+		       prev_fg, finger_count, abs_x, abs_y, now_ms);
 		prev_state = state;
 	}
 
 	switch (state) {
 
+	/* ════════════════════════════════════════════════════════
+	 * IDLE — waiting for touch
+	 * ════════════════════════════════════════════════════════ */
 	case TAP_STATE_IDLE:
-		if (event == EV_TOUCH) {
+		if (event == TAP_EVENT_TOUCH) {
 			touch_start_ms = now_ms;
 			touch_start_x = abs_x;
 			touch_start_y = abs_y;
-			state = TAP_STATE_TOUCH;
+			if (finger_count >= 2) {
+				state = TAP_STATE_TOUCH_2;
+			} else {
+				state = TAP_STATE_TOUCH;
+			}
 		}
 		return false;
 
+	/* ════════════════════════════════════════════════════════
+	 * TOUCH — measuring tap vs press
+	 * ════════════════════════════════════════════════════════ */
 	case TAP_STATE_TOUCH:
-		if (event == EV_RELEASE) {
+		if (event == TAP_EVENT_RELEASE) {
 			uint32_t held = (uint32_t)(now_ms - touch_start_ms);
 			bool moved = !within_thresh(abs_x, touch_start_x, TAP_MOVE_THRESH) ||
 			             !within_thresh(abs_y, touch_start_y, TAP_MOVE_THRESH);
 			if (held <= TAP_TIMEOUT_MS && !moved) {
+				/* Valid tap! Button down */
 				button_down = true;
 				tap_ms = now_ms;
 				tap_x = abs_x;
@@ -125,39 +151,74 @@ bool tps43_tapdrag_update(bool finger_down, uint16_t abs_x, uint16_t abs_y, uint
 			state = TAP_STATE_IDLE;
 			return false;
 		}
-		if (event == EV_MOTION) {
+		if (event == TAP_EVENT_MOTION) {
 			if (!within_thresh(abs_x, touch_start_x, TAP_MOVE_THRESH) ||
 			    !within_thresh(abs_y, touch_start_y, TAP_MOVE_THRESH)) {
 				state = TAP_STATE_DEAD;
 			}
 			return false;
 		}
-		if (event == EV_TIMEOUT) {
+		if (event == TAP_EVENT_TIMEOUT) {
 			uint32_t held = (uint32_t)(now_ms - touch_start_ms);
 			if (held > TAP_TIMEOUT_MS) {
 				state = TAP_STATE_DEAD;
 			}
 			return false;
 		}
+		if (event == TAP_EVENT_TOUCH && finger_count >= 2) {
+			state = TAP_STATE_TOUCH_2;
+		}
 		return false;
 
+	/* ════════════════════════════════════════════════════════
+	 * TOUCH_2 — second finger arrived (potential 2-finger tap)
+	 * ════════════════════════════════════════════════════════ */
+	case TAP_STATE_TOUCH_2:
+		if (event == TAP_EVENT_RELEASE) {
+			uint32_t held = (uint32_t)(now_ms - touch_start_ms);
+			if (held <= TAP_TIMEOUT_MS) {
+				/* 2-finger tap → right click */
+				if (right_click) *right_click = true;
+				state = TAP_STATE_IDLE;
+				return false;
+			}
+			state = TAP_STATE_IDLE;
+			return false;
+		}
+		if (event == TAP_EVENT_TIMEOUT) {
+			uint32_t held = (uint32_t)(now_ms - touch_start_ms);
+			if (held > TAP_TIMEOUT_MS) {
+				state = TAP_STATE_DEAD;
+			}
+			return false;
+		}
+		if (event == TAP_EVENT_MOTION) {
+			/* 2-finger movement → scroll, handled in main.c */
+			return false;
+		}
+		return false;
+
+	/* ════════════════════════════════════════════════════════
+	 * 1FG_TAPPED — tap happened, waiting for re-touch or timeout
+	 * ════════════════════════════════════════════════════════ */
 	case TAP_STATE_1FG_TAPPED:
-		if (event == EV_TOUCH) {
+		if (event == TAP_EVENT_TOUCH) {
 			uint32_t since_tap = (uint32_t)(now_ms - tap_ms);
 			if (since_tap <= DRAG_TIMEOUT_MS &&
 			    within_thresh(abs_x, tap_x, SAME_SPOT_THRESH) &&
 			    within_thresh(abs_y, tap_y, SAME_SPOT_THRESH)) {
-				re_down_ms = now_ms;
-				re_down_x = abs_x;
-				re_down_y = abs_y;
-				state = TAP_STATE_1FG_DRAG_OR_DC;
-				return true;
+				/* Re-touch in same spot within drag timeout → start drag */
+				if (finger_count == 1) {
+					state = TAP_STATE_1FG_DRAGGING;
+					return true;
+				}
 			}
+			/* Re-touch outside conditions → cancel, fire button up */
 			button_down = false;
 			state = TAP_STATE_IDLE;
 			return false;
 		}
-		if (event == EV_TIMEOUT) {
+		if (event == TAP_EVENT_TIMEOUT) {
 			uint32_t since_tap = (uint32_t)(now_ms - tap_ms);
 			if (since_tap > DRAG_TIMEOUT_MS) {
 				button_down = false;
@@ -166,50 +227,21 @@ bool tps43_tapdrag_update(bool finger_down, uint16_t abs_x, uint16_t abs_y, uint
 			}
 			return true;
 		}
-		if (event == EV_RELEASE) {
+		/* In TAPPED, a RELEASE without re-touch keeps button held
+		 * until timeout. This handles the case where TWO_RELEASE
+		 * events come in rapid succession (2-finger scenario). */
+		if (event == TAP_EVENT_RELEASE) {
 			return true;
 		}
 		return true;
 
-	case TAP_STATE_1FG_DRAG_OR_DC:
-		if (event == EV_RELEASE) {
-			uint32_t since_re = (uint32_t)(now_ms - re_down_ms);
-			bool moved = !within_thresh(abs_x, re_down_x, TAP_MOVE_THRESH) ||
-			             !within_thresh(abs_y, re_down_y, TAP_MOVE_THRESH);
-			if (since_re <= TAP_TIMEOUT_MS && !moved) {
-				button_down = false;
-				if (double_click) *double_click = true;
-				state = TAP_STATE_IDLE;
-				return false;
-			}
-			button_down = false;
-			state = TAP_STATE_IDLE;
-			return false;
-		}
-		if (event == EV_MOTION) {
-			state = TAP_STATE_1FG_DRAGGING;
-			return true;
-		}
-		if (event == EV_TIMEOUT) {
-			uint32_t since_re = (uint32_t)(now_ms - re_down_ms);
-			if (since_re > TAP_TIMEOUT_MS) {
-				button_down = false;
-				state = TAP_STATE_IDLE;
-				return false;
-			}
-			return true;
-		}
-		return true;
-
+	/* ════════════════════════════════════════════════════════
+	 * 1FG_DRAGGING — drag active, button held
+	 * ════════════════════════════════════════════════════════ */
 	case TAP_STATE_1FG_DRAGGING:
-		if (event == EV_RELEASE) {
-			lift_ms = now_ms;
-#ifdef CONFIG_TPS43_DRAGLOCK_ENABLE
-			drag_wait_timeout_ms = DRAGLOCK_TIMEOUT_MS;
-#else
-			drag_wait_timeout_ms = DROP_GRACE_MS;
-#endif
-			if (drag_wait_timeout_ms > 0) {
+		if (event == TAP_EVENT_RELEASE) {
+			if (DRAGLOCK_ENABLE) {
+				lift_ms = now_ms;
 				state = TAP_STATE_1FG_DRAG_WAIT;
 				return true;
 			}
@@ -217,15 +249,21 @@ bool tps43_tapdrag_update(bool finger_down, uint16_t abs_x, uint16_t abs_y, uint
 			state = TAP_STATE_IDLE;
 			return false;
 		}
-		if (event == EV_TOUCH || event == EV_MOTION) {
+		if (event == TAP_EVENT_TOUCH) {
+			return true;
+		}
+		if (event == TAP_EVENT_MOTION) {
 			return true;
 		}
 		return true;
 
+	/* ════════════════════════════════════════════════════════
+	 * 1FG_DRAG_WAIT — lift mid-drag, drag lock window
+	 * ════════════════════════════════════════════════════════ */
 	case TAP_STATE_1FG_DRAG_WAIT:
-		if (event == EV_TOUCH) {
+		if (event == TAP_EVENT_TOUCH) {
 			uint32_t since_lift = (uint32_t)(now_ms - lift_ms);
-			if (since_lift <= drag_wait_timeout_ms) {
+			if (since_lift <= DRAGLOCK_TIMEOUT_MS) {
 				state = TAP_STATE_1FG_DRAGGING;
 				return true;
 			}
@@ -233,9 +271,9 @@ bool tps43_tapdrag_update(bool finger_down, uint16_t abs_x, uint16_t abs_y, uint
 			state = TAP_STATE_IDLE;
 			return false;
 		}
-		if (event == EV_TIMEOUT) {
+		if (event == TAP_EVENT_TIMEOUT) {
 			uint32_t since_lift = (uint32_t)(now_ms - lift_ms);
-			if (since_lift > drag_wait_timeout_ms) {
+			if (since_lift > DRAGLOCK_TIMEOUT_MS) {
 				button_down = false;
 				state = TAP_STATE_IDLE;
 				return false;
@@ -244,8 +282,11 @@ bool tps43_tapdrag_update(bool finger_down, uint16_t abs_x, uint16_t abs_y, uint
 		}
 		return true;
 
+	/* ════════════════════════════════════════════════════════
+	 * DEAD — too much movement or prolonged touch
+	 * ════════════════════════════════════════════════════════ */
 	case TAP_STATE_DEAD:
-		if (event == EV_RELEASE) {
+		if (event == TAP_EVENT_RELEASE) {
 			state = TAP_STATE_IDLE;
 		}
 		return false;
