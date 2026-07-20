@@ -20,6 +20,7 @@ enum tap_state {
 	TAP_STATE_TOUCH,
 	TAP_STATE_TOUCH_2,
 	TAP_STATE_1FG_TAPPED,
+	TAP_STATE_1FG_DRAG_OR_DC,
 	TAP_STATE_1FG_DRAGGING,
 	TAP_STATE_1FG_DRAG_WAIT,
 	TAP_STATE_DEAD,
@@ -43,6 +44,9 @@ static uint16_t touch_start_y;
 static uint64_t tap_ms;
 static uint16_t tap_x;
 static uint16_t tap_y;
+static uint64_t re_down_ms;
+static uint16_t re_down_x;
+static uint16_t re_down_y;
 static uint64_t lift_ms;
 static uint32_t drag_wait_timeout_ms;
 static bool button_down;
@@ -103,7 +107,7 @@ bool tps43_tapdrag_update(bool finger_down, uint8_t finger_count,
 	/* Debug log on state change */
 	if (state != prev_state || event == TAP_EVENT_TOUCH || event == TAP_EVENT_RELEASE) {
 		static const char * const state_names[] = {
-			"IDLE", "TOUCH", "TOUCH_2", "TAPPED", "DRAGGING", "DRAG_WAIT", "DEAD"
+			"IDLE", "TOUCH", "TOUCH_2", "TAPPED", "DC_OR_DRAG", "DRAGGING", "DRAG_WAIT", "DEAD"
 		};
 		static const char * const event_names[] = {
 			"TOUCH", "RELEASE", "MOTION", "TIMEOUT"
@@ -208,13 +212,16 @@ bool tps43_tapdrag_update(bool finger_down, uint8_t finger_count,
 			if (since_tap <= DRAG_TIMEOUT_MS &&
 			    within_thresh(abs_x, tap_x, SAME_SPOT_THRESH) &&
 			    within_thresh(abs_y, tap_y, SAME_SPOT_THRESH)) {
-				/* Re-touch in same spot within drag timeout → start drag */
 				if (finger_count == 1) {
-					state = TAP_STATE_1FG_DRAGGING;
+					/* Ambiguous: could be drag or double-click.
+					 * Keep button DOWN, enter ambiguity state. */
+					re_down_ms = now_ms;
+					re_down_x = abs_x;
+					re_down_y = abs_y;
+					state = TAP_STATE_1FG_DRAG_OR_DC;
 					return true;
 				}
 			}
-			/* Re-touch outside conditions → cancel, fire button up */
 			button_down = false;
 			state = TAP_STATE_IDLE;
 			return false;
@@ -228,10 +235,42 @@ bool tps43_tapdrag_update(bool finger_down, uint8_t finger_count,
 			}
 			return true;
 		}
-		/* In TAPPED, a RELEASE without re-touch keeps button held
-		 * until timeout. This handles the case where TWO_RELEASE
-		 * events come in rapid succession (2-finger scenario). */
 		if (event == TAP_EVENT_RELEASE) {
+			return true;
+		}
+		return true;
+
+	/* ════════════════════════════════════════════════════════
+	 * 1FG_DRAG_OR_DC — re-touched after tap, deciding drag vs double-click
+	 * ════════════════════════════════════════════════════════ */
+	case TAP_STATE_1FG_DRAG_OR_DC:
+		if (event == TAP_EVENT_RELEASE) {
+			uint32_t since_re = (uint32_t)(now_ms - re_down_ms);
+			bool moved = !within_thresh(abs_x, re_down_x, TAP_MOVE_THRESH) ||
+			             !within_thresh(abs_y, re_down_y, TAP_MOVE_THRESH);
+			if (since_re <= TAP_TIMEOUT_MS && !moved) {
+				/* Second tap → double-click */
+				button_down = false;
+				if (double_click) *double_click = true;
+				state = TAP_STATE_IDLE;
+				return false;
+			}
+			button_down = false;
+			state = TAP_STATE_IDLE;
+			return false;
+		}
+		if (event == TAP_EVENT_MOTION) {
+			/* Moved → it's a drag */
+			state = TAP_STATE_1FG_DRAGGING;
+			return true;
+		}
+		if (event == TAP_EVENT_TIMEOUT) {
+			uint32_t since_re = (uint32_t)(now_ms - re_down_ms);
+			if (since_re > TAP_TIMEOUT_MS) {
+				button_down = false;
+				state = TAP_STATE_IDLE;
+				return false;
+			}
 			return true;
 		}
 		return true;
