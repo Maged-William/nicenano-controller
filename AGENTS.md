@@ -147,6 +147,8 @@ An experiment is an .md file lives in /experiments/[ExpXX]/[ExpXX].md
 
 An overview of all the experiments exists in /Experiments.md, which is a simple table with the id, status, short desc.
 
+An experiment can only be one of the following state [In progress, Done, Failed, Abandoned, Partial, Unknown].
+
 Each time you starting an experiment, you create a branch (ex: Exp02) where all the implementation exists in it.
 
 Update the Experiment documents with your hypothesis, execution plan, Success Criteria, Challenges (if any)
