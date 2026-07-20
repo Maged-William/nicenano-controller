@@ -312,7 +312,7 @@ config TPS43_DRAGLOCK_TIMEOUT_MS
 	int "Drag lock re-touch window (ms)"
 	default 300
 	range 50 1000
-	depends on TPS43_DRAGLOCK_ENABLE
+	depends on TPS43_TAPDRAG_ENABLE
 	help
 	  libinput default: 300ms. While dragging, if the finger lifts,
 	  this is how long the user has to touch down again to continue
