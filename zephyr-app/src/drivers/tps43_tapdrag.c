@@ -30,17 +30,12 @@ static bool click_pulse_done;
 static enum drag_state prev_state = 0xff;
 static bool prev_finger_down;
 
-static bool fd_debounced;
-static uint8_t fd_debounce_cnt;
+#define ABS_INVALID 0xFFFF
 
 void tps43_tapdrag_init(void)
 {
 	state = ST_IDLE;
 	click_pulse_done = false;
-	fd_debounced = false;
-	fd_debounce_cnt = 0;
-	last_valid_x = 0;
-	last_valid_y = 0;
 }
 
 static inline uint32_t abs_diff(uint16_t a, uint16_t b)
@@ -48,18 +43,14 @@ static inline uint32_t abs_diff(uint16_t a, uint16_t b)
 	return a > b ? (uint32_t)(a - b) : (uint32_t)(b - a);
 }
 
-static bool debounce_fd(bool raw)
+static inline bool is_lift(bool finger_down, uint16_t abs_x, uint16_t abs_y)
 {
-	if (raw == fd_debounced) {
-		fd_debounce_cnt = 0;
-		return fd_debounced;
-	}
-	fd_debounce_cnt++;
-	if (fd_debounce_cnt >= CONFIG_TPS43_FD_DEBOUNCE_TICKS) {
-		fd_debounced = raw;
-		fd_debounce_cnt = 0;
-	}
-	return fd_debounced;
+	return !finger_down && abs_x == ABS_INVALID && abs_y == ABS_INVALID;
+}
+
+static inline bool is_touch(bool finger_down, uint16_t abs_x, uint16_t abs_y)
+{
+	return finger_down && abs_x != ABS_INVALID && abs_y != ABS_INVALID;
 }
 
 bool tps43_tapdrag_update(bool finger_down, uint16_t abs_x, uint16_t abs_y, uint64_t now_ms)
@@ -75,9 +66,7 @@ bool tps43_tapdrag_update(bool finger_down, uint16_t abs_x, uint16_t abs_y, uint
 		prev_finger_down = finger_down;
 	}
 
-	bool fd = debounce_fd(finger_down);
-
-	if (finger_down) {
+	if (is_touch(finger_down, abs_x, abs_y)) {
 		last_valid_x = abs_x;
 		last_valid_y = abs_y;
 	}
@@ -85,7 +74,7 @@ bool tps43_tapdrag_update(bool finger_down, uint16_t abs_x, uint16_t abs_y, uint
 	switch (state) {
 
 	case ST_IDLE:
-		if (fd) {
+		if (is_touch(finger_down, abs_x, abs_y)) {
 			touch_start_ms = now_ms;
 			touch_start_x = abs_x;
 			touch_start_y = abs_y;
@@ -94,7 +83,7 @@ bool tps43_tapdrag_update(bool finger_down, uint16_t abs_x, uint16_t abs_y, uint
 		return false;
 
 	case ST_TOUCH:
-		if (!fd) {
+		if (is_lift(finger_down, abs_x, abs_y)) {
 			if ((now_ms - touch_start_ms) <= CONFIG_TPS43_TAP_MAX_TIME) {
 				tap_up_ms = now_ms;
 				tap_up_x = last_valid_x;
@@ -122,7 +111,7 @@ bool tps43_tapdrag_update(bool finger_down, uint16_t abs_x, uint16_t abs_y, uint
 			return false;
 		}
 
-		if (fd) {
+		if (is_touch(finger_down, abs_x, abs_y)) {
 			if (abs_diff(abs_x, tap_up_x) <= CONFIG_TPS43_SAME_SPOT_THRESH &&
 			    abs_diff(abs_y, tap_up_y) <= CONFIG_TPS43_SAME_SPOT_THRESH) {
 				last_x = abs_x;
@@ -142,7 +131,7 @@ bool tps43_tapdrag_update(bool finger_down, uint16_t abs_x, uint16_t abs_y, uint
 		return false;
 
 	case ST_ARMED:
-		if (!fd) {
+		if (is_lift(finger_down, abs_x, abs_y)) {
 			state = ST_IDLE;
 			return false;
 		}
@@ -164,14 +153,14 @@ bool tps43_tapdrag_update(bool finger_down, uint16_t abs_x, uint16_t abs_y, uint
 		return true;
 
 	case ST_DRAGGING:
-		if (!fd) {
+		if (is_lift(finger_down, abs_x, abs_y)) {
 			lift_ms = now_ms;
 			state = ST_LOCK_WAIT;
 		}
 		return true;
 
 	case ST_LOCK_WAIT:
-		if (fd) {
+		if (is_touch(finger_down, abs_x, abs_y)) {
 			state = ST_DRAGGING;
 			return true;
 		}
