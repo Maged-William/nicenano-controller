@@ -289,15 +289,19 @@ config TPS43_TAP_TIMEOUT_MS
 	  Longer = more forgiving of slow taps, but finger-down + hold may
 	  accidentally trigger a tap on release.
 
-config TPS43_DRAG_TIMEOUT_MS
-	int "Tap-then-drag re-touch window (ms)"
-	default 180
-	range 50 1000
+config TPS43_DOUBLE_CLICK_TIMEOUT_MS
+	int "Double-click / re-touch window (ms)"
+	default 250
+	range 50 500
 	depends on TPS43_TAPDRAG_ENABLE
 	help
-	  libinput default: 160ms + 20ms/finger ≈ 180ms.
-	  How long after a tap the user has to touch down again to start
-	  dragging (button stays held between tap and re-touch).
+	  After a tap, the window during which a second touch is accepted.
+	  If the second touch releases quickly (within TAP_TIMEOUT_MS):
+	    → double-click.
+	  If the second touch holds or moves:
+	    → drag start.
+	  Longer = more forgiving of slow double-taps, but drag feels
+	  delayed. Shorter = snappier but may miss slow double-taps.
 
 config TPS43_DRAGLOCK_ENABLE
 	bool "Enable drag lock (lift & re-touch to continue drag)"

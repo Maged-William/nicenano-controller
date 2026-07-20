@@ -9,9 +9,10 @@ void tps43_tapdrag_init(void);
 
 /* Returns left button state (true = pressed).
  * Sets *right_click to true when a right click event should fire.
+ * Sets *double_click to true when a double-click event should fire.
  */
 bool tps43_tapdrag_update(bool finger_down, uint8_t finger_count,
                           uint16_t abs_x, uint16_t abs_y, uint64_t now_ms,
-                          bool *right_click);
+                          bool *right_click, bool *double_click);
 
 #endif
