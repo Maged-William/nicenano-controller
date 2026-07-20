@@ -222,9 +222,8 @@ int main(void)
 				                  tps43_regs[TPS43_XABS_LOW  - TPS43_GESTURE0];
 				uint16_t abs_y = ((uint16_t)tps43_regs[TPS43_YABS_HIGH - TPS43_GESTURE0] << 8) |
 				                  tps43_regs[TPS43_YABS_LOW  - TPS43_GESTURE0];
-				bool rc = false, dc = false;
-				uint8_t fg = touched ? fingers : 0;
-				tps43_left_btn = tps43_tapdrag_update(touched, fg, abs_x, abs_y, k_uptime_get(), &rc, &dc);
+				bool dc = false;
+				tps43_left_btn = tps43_tapdrag_update(touched, abs_x, abs_y, k_uptime_get(), &dc);
 
 				if (tps43_left_btn != tps43_left_btn_prev) {
 					if (tps43_left_btn) {
@@ -234,13 +233,6 @@ int main(void)
 					}
 					tps43_left_btn_prev = tps43_left_btn;
 					printk("BTN_L: %s @%llu\n", tps43_left_btn ? "DOWN" : "UP", k_uptime_get());
-				}
-				if (rc) {
-					printk("BTN_R: CLICK @%llu\n", k_uptime_get());
-					mouse_buttons |= 2;
-					send_mouse_report(0, 0, 0, 0);
-					mouse_buttons &= ~2;
-					send_mouse_report(0, 0, 0, 0);
 				}
 				if (dc) {
 					printk("BTN_L: DOUBLE @%llu\n", k_uptime_get());
