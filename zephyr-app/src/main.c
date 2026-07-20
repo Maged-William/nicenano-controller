@@ -199,29 +199,53 @@ int main(void)
 			uint8_t fingers = tps43_regs[TPS43_FINGER_COUNT - TPS43_GESTURE0];
 			tps43_dbg_fingers = touched ? fingers : 0;
 
+			/* Absolute position (used by edge scroll and tap FSM) */
+			uint16_t abs_x = 0, abs_y = 0;
 			if (touched) {
-				if (fingers >= 2) {
-					mouse_wheel   += (int)((float)tdy * TPS43_SCROLL_SENS);
-					mouse_wheel_h += (int)((float)tdx * TPS43_SCROLL_SENS);
-				} else {
-					float mv_x = (float)tdx * TPS43_SENS;
-					float mv_y = (float)tdy * TPS43_SENS;
+				abs_x = ((uint16_t)tps43_regs[TPS43_XABS_HIGH - TPS43_GESTURE0] << 8) |
+				         tps43_regs[TPS43_XABS_LOW  - TPS43_GESTURE0];
+				abs_y = ((uint16_t)tps43_regs[TPS43_YABS_HIGH - TPS43_GESTURE0] << 8) |
+				         tps43_regs[TPS43_YABS_LOW  - TPS43_GESTURE0];
+			}
+
+			if (touched) {
+#if CONFIG_TPS43_EDGESCROLL_ENABLE
+				bool edge_scroll = false;
+				if (fingers < 2) {
+					uint32_t er_thresh = (uint32_t)CONFIG_TPS43_ABS_MAX_X * (100 - CONFIG_TPS43_EDGE_RIGHT_PCT) / 100;
+					uint32_t eb_thresh = (uint32_t)CONFIG_TPS43_ABS_MAX_Y * (100 - CONFIG_TPS43_EDGE_BOTTOM_PCT) / 100;
+
+					if (abs_x > er_thresh) {
+						mouse_wheel += (int)((float)tdy * TPS43_SCROLL_SENS);
+						edge_scroll = true;
+					}
+					if (abs_y > eb_thresh) {
+						mouse_wheel_h += (int)((float)tdx * TPS43_SCROLL_SENS);
+						edge_scroll = true;
+					}
+				}
+				if (!edge_scroll)
+#endif
+				{
+					if (fingers >= 2) {
+						mouse_wheel   += (int)((float)tdy * TPS43_SCROLL_SENS);
+						mouse_wheel_h += (int)((float)tdx * TPS43_SCROLL_SENS);
+					} else {
+						float mv_x = (float)tdx * TPS43_SENS;
+						float mv_y = (float)tdy * TPS43_SENS;
 #if CONFIG_TPS43_INVERT_X
-					mv_x = -mv_x;
+						mv_x = -mv_x;
 #endif
 #if CONFIG_TPS43_INVERT_Y
-					mv_y = -mv_y;
+						mv_y = -mv_y;
 #endif
-					mouse_acc_x += mv_x;
-					mouse_acc_y += mv_y;
+						mouse_acc_x += mv_x;
+						mouse_acc_y += mv_y;
+					}
 				}
 			}
 #if CONFIG_TPS43_TAPDRAG_ENABLE
 			{
-				uint16_t abs_x = ((uint16_t)tps43_regs[TPS43_XABS_HIGH - TPS43_GESTURE0] << 8) |
-				                  tps43_regs[TPS43_XABS_LOW  - TPS43_GESTURE0];
-				uint16_t abs_y = ((uint16_t)tps43_regs[TPS43_YABS_HIGH - TPS43_GESTURE0] << 8) |
-				                  tps43_regs[TPS43_YABS_LOW  - TPS43_GESTURE0];
 				bool rc = false;
 				bool dc = false;
 				uint8_t fg = touched ? fingers : 0;
