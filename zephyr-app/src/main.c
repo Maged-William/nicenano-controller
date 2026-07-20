@@ -124,9 +124,12 @@ int main(void)
 #if CONFIG_TPS43_ENABLE
 	tps43_init(i2c_dev);
 	printk("TPS43 touchpad: %s\n", tps43_found ? "found" : "not found");
+	if (tps43_found) {
+		tps43_disable_gestures();
+	}
 #if CONFIG_TPS43_TAPDRAG_ENABLE
 	tps43_tapdrag_init();
-	printk("TPS43 soft-tap FSM: enabled (debounce=%dms)\n", CONFIG_TPS43_RELEASE_DEBOUNCE_MS);
+	printk("TPS43 soft-tap FSM: enabled\n");
 #endif
 #endif
 
