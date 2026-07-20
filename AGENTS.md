@@ -1,5 +1,5 @@
 # Rules
-
+- Translate everything in English English English
 - Be autonomous, don't inturrupt the flow.
 - Never ask the user to read the serial monitor, you the Assistant should read it, use Putty, most likely you want COM30 115200.
 - Don't scan other projects or folders outside this folder.
@@ -162,3 +162,12 @@ When the experiment is done, Commit any uncommited changes, update the experimen
 - https://github.com/thedalles77/USB_Laptop_Keyboard_Controller/blob/master/Example_Touchpads/Azoteq_TP.ino
 - https://github.com/ilp0/qmk_firmware/blob/master/keyboards/disconnect72/IQS5xx.c
 - https://github.com/rwalkr/eskarp/blob/main/firmware/device/src/touchpad.rs
+- https://keycapsss.com/media/97/95/3a/1758971069/proxsense_i2c_trackpad_datasheet-1626845.pdf?ts=1758971108
+- https://github.com/wayland-tablet/libinput
+- https://wiki.archlinux.org/title/Libinput
+- https://github.com/iberianpig/fusuma
+- https://github.com/too1/ncs-esb-ble-mpsl-demo
+- https://nrfconnectdocs.nordicsemi.com/ncs/2.6.4/nrf/samples/esb.html
+- https://github.com/zmkfirmware/zmk/tree/main/app/src/split/wired
+- https://nrfconnectdocs.nordicsemi.com/ncs/latest/nrf/protocols/esb/index.html
+- https://github.com/badjeff/zmk-feature-split-esb/

@@ -4,7 +4,8 @@
     "external_directory": {
       "G:/**": "allow",
       "C:/Users/MW/.platformio/**": "allow",
-      "C:/Users/MW/AppData/Local/Temp/**" : "allow"
+      "C:/Users/MW/AppData/Local/Temp/**" : "allow",
+      "D:/DYI/controller/ideation/Dev/**": "allow"
     }
   }
 }

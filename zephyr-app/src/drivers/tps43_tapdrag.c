@@ -11,6 +11,7 @@
 #define DRAGLOCK_TIMEOUT_MS    CONFIG_TPS43_DRAGLOCK_TIMEOUT_MS
 #define TAP_MOVE_THRESH        CONFIG_TPS43_TAP_MOVE_THRESH
 #define SAME_SPOT_THRESH       CONFIG_TPS43_SAME_SPOT_THRESH
+#define DRAGLOCK_ENABLE        CONFIG_TPS43_DRAGLOCK_ENABLE
 
 /* ─── FSM states (port of libinput evdev-mt-touchpad-tap.c) ─ */
 
@@ -239,12 +240,16 @@ bool tps43_tapdrag_update(bool finger_down, uint8_t finger_count,
 	 * ════════════════════════════════════════════════════════ */
 	case TAP_STATE_1FG_DRAGGING:
 		if (event == TAP_EVENT_RELEASE) {
-			lift_ms = now_ms;
-			state = TAP_STATE_1FG_DRAG_WAIT;
-			return true;
+			if (DRAGLOCK_ENABLE) {
+				lift_ms = now_ms;
+				state = TAP_STATE_1FG_DRAG_WAIT;
+				return true;
+			}
+			button_down = false;
+			state = TAP_STATE_IDLE;
+			return false;
 		}
 		if (event == TAP_EVENT_TOUCH) {
-			/* Still touching, continue drag */
 			return true;
 		}
 		if (event == TAP_EVENT_MOTION) {
