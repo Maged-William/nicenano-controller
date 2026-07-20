@@ -152,7 +152,7 @@ int main(void)
 		printk("Gyro calibration disabled, using zero offsets\n");
 #endif
 
-	printk("Exp11: Dual-gyro HID mouse + TPS43 touchpad at 250Hz\n");
+	printk("Exp12: Dual-gyro HID mouse + TPS43 tap-drag touchpad at 250Hz\n");
 	printk("tick\tFX\tFY\tFZ\tCH0\tCH1\tCH2\tCH3\tTP_X\tTP_Y\tTP_F\n");
 
 	int64_t next_tick;

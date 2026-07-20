@@ -144,19 +144,37 @@ config TPS43_DRAG_LOCK_TIMEOUT
 
 | Run | Time | Result | Notes |
 |-----|------|--------|-------|
-| | | | |
+| Initial build | 5m 29s | ❌ Build failed | Missing CMakeLists.txt entry for tps43_tapdrag.c |
+| Fixed CMakeLists.txt | 5m 06s | ✅ Clean build | UF2 artifact produced |
+
+### Serial Output (at boot)
+
+```
+*** Booting Zephyr OS build v4.1.0 ***
+ADC at 0x48
+ADS1015 (12-bit)
+TPS43 touchpad: found
+TPS43 tap-drag FSM: enabled
+BMI160 S1(500dps)=1 S2(125dps)=1
+Calibrating gyro (hold still)... done
+Exp11: Dual-gyro HID mouse + TPS43 touchpad at 250Hz
+tick  FX  FY  FZ  CH0  CH1  CH2  CH3  TP_X  TP_Y  TP_F
+```
+
+All columns present, touchpad & FSM initialized, no crashes.
 
 ## Success Criteria
 
-- [ ] Firmware builds on GitHub Actions, produces UF2
-- [ ] Serial output shows normal operation (heartbeat, ADC, data rows)
-- [ ] Tap-to-click still works (single tap produces a click)
-- [ ] Tap-and-drag works: tap, lift, re-touch in same spot, drag moves cursor with button held
-- [ ] Drag lock works: lift mid-drag, re-touch within timeout, drag continues
-- [ ] Drag lock timeout works: lift mid-drag, wait >timeout, button released
-- [ ] Confirm window branch works: re-touch, wait >confirm window, move → button released
-- [ ] Normal touchpad scrolling (2-finger) is unaffected
-- [ ] Combined gyro + touchpad operation is unaffected
+- [x] Firmware builds on GitHub Actions, produces UF2
+- [x] Serial output shows normal operation (heartbeat, ADC, data rows)
+- [x] "TPS43 tap-drag FSM: enabled" appears in serial output
+- [ ] Tap-to-click still works (single tap produces a click) — **needs physical test**
+- [ ] Tap-and-drag works: tap, lift, re-touch in same spot, drag moves cursor with button held — **needs physical test**
+- [ ] Drag lock works: lift mid-drag, re-touch within timeout, drag continues — **needs physical test**
+- [ ] Drag lock timeout works: lift mid-drag, wait >timeout, button released — **needs physical test**
+- [ ] Confirm window branch works: re-touch, wait >confirm window, move → button released — **needs physical test**
+- [ ] Normal touchpad scrolling (2-finger) is unaffected — **needs physical test**
+- [ ] Combined gyro + touchpad operation is unaffected — **needs physical test**
 
 ## Challenges
 
