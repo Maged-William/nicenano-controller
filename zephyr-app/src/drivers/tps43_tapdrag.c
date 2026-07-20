@@ -30,12 +30,15 @@ static bool click_pulse_done;
 static enum drag_state prev_state = 0xff;
 static bool prev_finger_down;
 
+static uint64_t glitch_grace_until;
+
 #define ABS_INVALID 0xFFFF
 
 void tps43_tapdrag_init(void)
 {
 	state = ST_IDLE;
 	click_pulse_done = false;
+	glitch_grace_until = 0;
 }
 
 static inline uint32_t abs_diff(uint16_t a, uint16_t b)
@@ -69,6 +72,21 @@ bool tps43_tapdrag_update(bool finger_down, uint16_t abs_x, uint16_t abs_y, uint
 	if (is_touch(finger_down, abs_x, abs_y)) {
 		last_valid_x = abs_x;
 		last_valid_y = abs_y;
+	}
+
+	/* Gesture0 glitch detection: TPS43 fires hardware tap (gesture0)
+	 * during a sustained touch, which temporarily clears FINGER_COUNT
+	 * to 0 while abs registers still hold a valid position.
+	 * When we see !finger_down + valid abs, set a grace period to
+	 * wait for the TPS43 to recover before treating it as a lift.
+	 * A real lift always has abs=0xFFFF immediately. */
+	if (!finger_down && abs_x != ABS_INVALID && abs_y != ABS_INVALID) {
+		if (state == ST_ARMED || state == ST_DRAGGING) {
+			glitch_grace_until = now_ms + CONFIG_TPS43_GLITCH_GRACE_MS;
+		}
+	}
+	if (is_touch(finger_down, abs_x, abs_y)) {
+		glitch_grace_until = 0;
 	}
 
 	switch (state) {
@@ -131,7 +149,7 @@ bool tps43_tapdrag_update(bool finger_down, uint16_t abs_x, uint16_t abs_y, uint
 		return false;
 
 	case ST_ARMED:
-		if (is_lift(finger_down, abs_x, abs_y)) {
+		if (!finger_down && now_ms >= glitch_grace_until) {
 			state = ST_IDLE;
 			return false;
 		}
@@ -153,7 +171,7 @@ bool tps43_tapdrag_update(bool finger_down, uint16_t abs_x, uint16_t abs_y, uint
 		return true;
 
 	case ST_DRAGGING:
-		if (is_lift(finger_down, abs_x, abs_y)) {
+		if (!finger_down && now_ms >= glitch_grace_until) {
 			lift_ms = now_ms;
 			state = ST_LOCK_WAIT;
 		}

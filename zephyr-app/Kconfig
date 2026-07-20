@@ -335,6 +335,17 @@ config TPS43_DRAG_LOCK_TIMEOUT
 	  Timer3: how long the user has to re-touch after lifting mid-drag
 	  to continue dragging without releasing the button.
 
+config TPS43_GLITCH_GRACE_MS
+	int "Gesture0 glitch grace period (ms)"
+	default 150
+	range 50 500
+	depends on TPS43_TAPDRAG_ENABLE
+	help
+	  When TPS43 gesture0 fires mid-touch, FINGER_COUNT drops to 0 and
+	  the abs registers go to 0xFFFF after ~25ms. During this glitch the
+	  FSM ignores lift signals for this duration, letting the TPS43
+	  recover and finger_count return to normal.
+
 config TPS43_ARM_MOVE_THRESH
 	int "Armed state move threshold (abs counts)"
 	default 3
