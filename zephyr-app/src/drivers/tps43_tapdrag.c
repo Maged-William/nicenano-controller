@@ -24,6 +24,8 @@ static uint16_t tap_up_x;
 static uint16_t tap_up_y;
 static uint16_t last_x;
 static uint16_t last_y;
+static uint16_t last_valid_x;
+static uint16_t last_valid_y;
 static bool click_pulse_done;
 static enum drag_state prev_state = 0xff;
 static bool prev_finger_down;
@@ -37,6 +39,8 @@ void tps43_tapdrag_init(void)
 	click_pulse_done = false;
 	fd_debounced = false;
 	fd_debounce_cnt = 0;
+	last_valid_x = 0;
+	last_valid_y = 0;
 }
 
 static inline uint32_t abs_diff(uint16_t a, uint16_t b)
@@ -73,6 +77,11 @@ bool tps43_tapdrag_update(bool finger_down, uint16_t abs_x, uint16_t abs_y, uint
 
 	bool fd = debounce_fd(finger_down);
 
+	if (finger_down) {
+		last_valid_x = abs_x;
+		last_valid_y = abs_y;
+	}
+
 	switch (state) {
 
 	case ST_IDLE:
@@ -88,8 +97,8 @@ bool tps43_tapdrag_update(bool finger_down, uint16_t abs_x, uint16_t abs_y, uint
 		if (!fd) {
 			if ((now_ms - touch_start_ms) <= CONFIG_TPS43_TAP_MAX_TIME) {
 				tap_up_ms = now_ms;
-				tap_up_x = abs_x;
-				tap_up_y = abs_y;
+				tap_up_x = last_valid_x;
+				tap_up_y = last_valid_y;
 				click_pulse_done = false;
 				state = ST_TAP_WAIT;
 				return true;
