@@ -12,6 +12,7 @@
 #define DROP_GRACE_MS          CONFIG_TPS43_DROP_GRACE_MS
 #define TAP_MOVE_THRESH        CONFIG_TPS43_TAP_MOVE_THRESH
 #define SAME_SPOT_THRESH       CONFIG_TPS43_SAME_SPOT_THRESH
+#define RELEASE_DEBOUNCE_MS    CONFIG_TPS43_RELEASE_DEBOUNCE_MS
 
 /* ─── FSM states (port of libinput evdev-mt-touchpad-tap.c) ─ */
 
@@ -53,6 +54,8 @@ static bool button_down;
 
 static enum tap_state prev_state = 0xff;
 static uint8_t prev_fg_count;
+/* Debounce: track when FINGER_COUNT first dropped to filter gesture glitches */
+static uint64_t finger_lost_ms;
 
 /* ─── Helpers ─────────────────────────────────────────────── */
 
@@ -74,12 +77,29 @@ void tps43_tapdrag_init(void)
 	button_down = false;
 	prev_state = 0xff;
 	prev_fg_count = 0xff;
+	finger_lost_ms = 0;
 }
 
 bool tps43_tapdrag_update(bool finger_down, uint8_t finger_count,
                           uint16_t abs_x, uint16_t abs_y, uint64_t now_ms,
                           bool *right_click, bool *double_click)
 {
+	/* Debounce: once finger is lost, wait RELEASE_DEBOUNCE_MS before
+	 * declaring a real release. This filters TPS43 gesture-event glitches
+	 * where FINGER_COUNT briefly drops to 0 for 66-100ms. During that
+	 * window we keep reporting the last valid finger state. */
+	if (finger_down) {
+		finger_lost_ms = 0;
+	} else if (finger_lost_ms == 0) {
+		finger_lost_ms = now_ms;
+	}
+	if (!finger_down && finger_lost_ms > 0 &&
+	    (now_ms - finger_lost_ms) < RELEASE_DEBOUNCE_MS) {
+		/* Still within debounce window — treat as still touched */
+		finger_down = true;
+		finger_count = prev_fg_count > 0 ? (uint8_t)prev_fg_count : 1;
+	}
+
 	enum tap_event event;
 	bool was_down = (prev_fg_count > 0);
 	uint8_t prev_fg = prev_fg_count;

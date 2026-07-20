@@ -281,7 +281,7 @@ config TPS43_TAPDRAG_ENABLE
 
 config TPS43_TAP_TIMEOUT_MS
 	int "Tap detection timeout (ms)"
-	default 180
+	default 200
 	range 50 500
 	depends on TPS43_TAPDRAG_ENABLE
 	help
@@ -290,26 +290,37 @@ config TPS43_TAP_TIMEOUT_MS
 	  accidentally trigger a tap on release.
 
 config TPS43_DRAG_TIMEOUT_MS
-	int "Tap-then-drag re-touch window (ms)"
-	default 180
+	int "Tap-then-drag/double-tap re-touch window (ms)"
+	default 350
 	range 50 1000
 	depends on TPS43_TAPDRAG_ENABLE
 	help
-	  libinput default: 160ms + 20ms/finger ≈ 180ms.
 	  How long after a tap the user has to touch down again to start
-	  dragging (button stays held between tap and re-touch).
+	  dragging or do a double-click. Longer = easier to re-touch in time
+	  but may feel sluggish. 180ms is libinput default for drag;
+	  350ms is more forgiving for double-click.
+
+config TPS43_RELEASE_DEBOUNCE_MS
+	int "Finger-up debounce (ms) — filters gesture-event FINGER_COUNT glitches"
+	default 120
+	range 20 300
+	depends on TPS43_TAPDRAG_ENABLE
+	help
+	  TPS43 gesture events briefly drop FINGER_COUNT to 0 for 66-100ms.
+	  This debounce keeps reporting "finger down" for this duration after
+	  the first FINGER_COUNT=0, filtering out those glitches. Must be
+	  longer than the worst-case glitch (~100ms). 120ms is safe.
 
 config TPS43_DROP_GRACE_MS
-	int "Drop grace period (ms) — debounce against brief contact loss"
-	default 40
+	int "Drop grace period (ms) — re-touch window after brief contact loss"
+	default 60
 	range 0 200
 	depends on TPS43_TAPDRAG_ENABLE
 	help
-	  When the finger lifts during a drag, the button stays held for
-	  this brief window. If the finger re-touches within this time,
-	  the drag continues. This prevents accidental drops when the
-	  TPS43 briefly loses contact (e.g. during fast swipes).
-	  0 = instant drop, no grace. 40ms is usually imperceptible.
+	  After the debounce declares a real finger-up, the button stays held
+	  for this window so a rapid re-touch can continue the drag. This is
+	  shorter than the debounce; it handles genuine brief lifts during
+	  fast swipes. 0 = no grace.
 
 config TPS43_DRAGLOCK_ENABLE
 	bool "Enable drag lock (lift & re-touch to continue drag)"
@@ -333,23 +344,23 @@ config TPS43_DRAGLOCK_TIMEOUT_MS
 
 config TPS43_TAP_MOVE_THRESH
 	int "Tap movement threshold (abs counts)"
-	default 30
-	range 5 500
+	default 200
+	range 5 1000
 	depends on TPS43_TAPDRAG_ENABLE
 	help
-	  libinput default: 1.3mm (~30 TPS43 abs units).
 	  Maximum finger movement during a touch for it to still count as a tap.
-	  Larger = more tolerant of finger wiggle.
+	  The TPS43 abs range is 0-1023; 200 allows ~20% of the pad for
+	  natural finger placement wiggle. Larger = more tolerant.
 
 config TPS43_SAME_SPOT_THRESH
 	int "Re-touch same-spot threshold (abs counts)"
-	default 80
-	range 5 500
+	default 300
+	range 5 1000
 	depends on TPS43_TAPDRAG_ENABLE
 	help
 	  How close the re-touch must land to the tap-up position to qualify
-	  as a drag continuation (rather than a new tap). Larger = easier to
-	  re-arm drag.
+	  as a drag continuation or double-click. Larger = easier to re-arm.
+	  ~30% of the pad range is reasonable.
 
 endmenu
 
