@@ -55,6 +55,8 @@ static bool tps43_left_btn_prev;
 static int16_t tps43_dbg_dx;
 static int16_t tps43_dbg_dy;
 static uint8_t tps43_dbg_fingers;
+static uint16_t tps43_dbg_abs_x;
+static uint16_t tps43_dbg_abs_y;
 #endif
 
 /* ================================================================
@@ -131,6 +133,13 @@ int main(void)
 	tps43_tapdrag_init();
 	printk("TPS43 soft-tap FSM: enabled\n");
 #endif
+#if CONFIG_TPS43_EDGESCROLL_ENABLE
+	{
+		uint32_t er = (uint32_t)CONFIG_TPS43_ABS_MAX_X * (100 - CONFIG_TPS43_EDGE_RIGHT_PCT) / 100;
+		uint32_t eb = (uint32_t)CONFIG_TPS43_ABS_MAX_Y * (100 - CONFIG_TPS43_EDGE_BOTTOM_PCT) / 100;
+		printk("TPS43 edge scroll: right X>%u, bottom Y>%u\n", er, eb);
+	}
+#endif
 #endif
 
 	bool bmi1 = bmi160_sensor_init(CS1_PIN, S1_GYRO_RANGE_REG);
@@ -153,8 +162,8 @@ int main(void)
 		printk("Gyro calibration disabled, using zero offsets\n");
 #endif
 
-	printk("Exp13: Dual-gyro HID mouse + TPS43 soft-tap FSM at 250Hz\n");
-	printk("tick\tFX\tFY\tFZ\tCH0\tCH1\tCH2\tCH3\tTP_X\tTP_Y\tTP_F\n");
+	printk("Exp15: Dual-gyro HID mouse + TPS43 soft-tap FSM + edge scroll at 250Hz\n");
+	printk("tick\tFX\tFY\tFZ\tCH0\tCH1\tCH2\tCH3\tTP_X\tTP_Y\tTP_F\tABS_X\tABS_Y\n");
 
 	int64_t next_tick;
 	int tick_count = 0;
@@ -207,11 +216,13 @@ int main(void)
 				abs_y = ((uint16_t)tps43_regs[TPS43_YABS_HIGH - TPS43_GESTURE0] << 8) |
 				         tps43_regs[TPS43_YABS_LOW  - TPS43_GESTURE0];
 			}
+			tps43_dbg_abs_x = abs_x;
+			tps43_dbg_abs_y = abs_y;
 
 			if (touched) {
 #if CONFIG_TPS43_EDGESCROLL_ENABLE
 				bool edge_scroll = false;
-				if (fingers < 2) {
+				{
 					uint32_t er_thresh = (uint32_t)CONFIG_TPS43_ABS_MAX_X * (100 - CONFIG_TPS43_EDGE_RIGHT_PCT) / 100;
 					uint32_t eb_thresh = (uint32_t)CONFIG_TPS43_ABS_MAX_Y * (100 - CONFIG_TPS43_EDGE_BOTTOM_PCT) / 100;
 
@@ -224,25 +235,35 @@ int main(void)
 						edge_scroll = true;
 					}
 				}
-				if (!edge_scroll)
-#endif
-				{
-					if (fingers >= 2) {
-						mouse_wheel   += (int)((float)tdy * TPS43_SCROLL_SENS);
-						mouse_wheel_h += (int)((float)tdx * TPS43_SCROLL_SENS);
-					} else {
-						float mv_x = (float)tdx * TPS43_SENS;
-						float mv_y = (float)tdy * TPS43_SENS;
+				if (!edge_scroll) {
+					float mv_x = (float)tdx * TPS43_SENS;
+					float mv_y = (float)tdy * TPS43_SENS;
 #if CONFIG_TPS43_INVERT_X
-						mv_x = -mv_x;
+					mv_x = -mv_x;
 #endif
 #if CONFIG_TPS43_INVERT_Y
-						mv_y = -mv_y;
+					mv_y = -mv_y;
 #endif
-						mouse_acc_x += mv_x;
-						mouse_acc_y += mv_y;
-					}
+					mouse_acc_x += mv_x;
+					mouse_acc_y += mv_y;
 				}
+#else
+				if (fingers >= 2) {
+					mouse_wheel   += (int)((float)tdy * TPS43_SCROLL_SENS);
+					mouse_wheel_h += (int)((float)tdx * TPS43_SCROLL_SENS);
+				} else {
+					float mv_x = (float)tdx * TPS43_SENS;
+					float mv_y = (float)tdy * TPS43_SENS;
+#if CONFIG_TPS43_INVERT_X
+					mv_x = -mv_x;
+#endif
+#if CONFIG_TPS43_INVERT_Y
+					mv_y = -mv_y;
+#endif
+					mouse_acc_x += mv_x;
+					mouse_acc_y += mv_y;
+				}
+#endif
 			}
 #if CONFIG_TPS43_TAPDRAG_ENABLE
 			{
@@ -321,14 +342,15 @@ int main(void)
 			int16_t ch1 = ads1015_read_channel(1);
 			int16_t ch2 = ads1015_read_channel(2);
 			int16_t ch3 = ads1015_read_channel(3);
-			printk("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
+			printk("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
 			       tick_count, (int)fx, (int)fy, (int)fz,
 			       ch0, ch1, ch2, ch3,
 #if CONFIG_TPS43_ENABLE
 			       tps43_dbg_dx, tps43_dbg_dy, tps43_dbg_fingers,
-			       mouse_buttons, dx, dy
+			       mouse_buttons, dx, dy,
+			       tps43_dbg_abs_x, tps43_dbg_abs_y
 #else
-			       0, 0, 0, 0, 0, 0
+			       0, 0, 0, 0, 0, 0, 0, 0
 #endif
 			       );
 		}

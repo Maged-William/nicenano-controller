@@ -368,30 +368,28 @@ if TPS43_EDGESCROLL_ENABLE
 
 config TPS43_ABS_MAX_X
 	int "Touchpad absolute X max value"
-	default 65535
+	default 1024
 	range 1 65535
 	help
 	  Maximum absolute X value the touchpad can report.
-	  Adjust to match your touchpad's actual resolution
-	  (e.g., 1024 for a 1024-unit wide touchpad).
 
 config TPS43_ABS_MAX_Y
 	int "Touchpad absolute Y max value"
-	default 65535
+	default 1024
 	range 1 65535
 	help
 	  Maximum absolute Y value the touchpad can report.
 
 config TPS43_EDGE_RIGHT_PCT
 	int "Right edge zone width (%)"
-	default 10
+	default 15
 	range 3 50
 	help
 	  Percentage from the right edge where vertical scroll activates.
 
 config TPS43_EDGE_BOTTOM_PCT
 	int "Bottom edge zone height (%)"
-	default 10
+	default 15
 	range 3 50
 	help
 	  Percentage from the bottom edge where horizontal scroll activates.

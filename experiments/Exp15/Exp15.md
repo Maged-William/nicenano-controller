@@ -40,16 +40,25 @@ Edge zones are defined as a configurable percentage from the right/bottom edge, 
 | Entry | Default | Range | Purpose |
 |-------|---------|-------|---------|
 | `TPS43_EDGESCROLL_ENABLE` | n | - | Master enable for 1-finger edge scroll |
-| `TPS43_ABS_MAX_X` | 65535 | 1–65535 | Max absolute X value the touchpad reports |
-| `TPS43_ABS_MAX_Y` | 65535 | 1–65535 | Max absolute Y value the touchpad reports |
-| `TPS43_EDGE_RIGHT_PCT` | 10 | 3–50 | % from right edge where vertical scroll activates |
-| `TPS43_EDGE_BOTTOM_PCT` | 10 | 3–50 | % from bottom edge where horizontal scroll activates |
+| `TPS43_ABS_MAX_X` | 1024 | 1–65535 | Max absolute X value the touchpad reports |
+| `TPS43_ABS_MAX_Y` | 1024 | 1–65535 | Max absolute Y value the touchpad reports |
+| `TPS43_EDGE_RIGHT_PCT` | 15 | 3–50 | % from right edge where vertical scroll activates |
+| `TPS43_EDGE_BOTTOM_PCT` | 15 | 3–50 | % from bottom edge where horizontal scroll activates |
+
+### Behavior
+
+When `TPS43_EDGESCROLL_ENABLE=y`:
+- 1-finger in right edge → vertical scroll (tdy → mouse_wheel)
+- 1-finger in bottom edge → horizontal scroll (tdx → mouse_wheel_h)
+- 1-finger in center → pointer motion
+- 2-finger scroll **disabled** (edge scroll replaces it)
+- Taps/clicks/drags work normally (FSM unchanged)
 
 ### Success Criteria
 
 - [ ] 1-finger on right edge → vertical scroll (up/down)
 - [ ] 1-finger on bottom edge → horizontal scroll (left/right)
 - [ ] 1-finger in center → pointer motion (unchanged)
-- [ ] 2-finger scroll works anywhere (unchanged)
+- [ ] 2-finger scroll disabled when edge scroll enabled
 - [ ] Taps/clicks/drags still work in edge zone (FSM unchanged)
 - [ ] CI build passes with no warnings
