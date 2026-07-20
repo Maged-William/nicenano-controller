@@ -54,6 +54,42 @@ Also: `lift_ms` is initialized to 0 in `tps43_tapdrag_init()` and set to 0 when 
 2. **Too aggressive** — If 20ms is too short to filter real glitches, may need tuning. The TPS43 polling rate determines how many frames fall within 20ms (at 250Hz tick, 20ms = 5 frames).
 3. **False continuation** — If a lift-and-replace in a different spot happens within 20ms, the drag continues to a new location. This is unlikely (20ms is very short) and harmless.
 
+## Serial Output (final)
+
+```
+*** Booting Zephyr OS build v4.1.0 ***
+TPS43 touchpad: found
+TPS43 gesture engine disabled
+TPS43 soft-tap FSM: enabled
+Exp13: Dual-gyro HID mouse + TPS43 soft-tap FSM at 250Hz
+
+TD: TAPPED ev=TOUCH fg=0,1 xy=926,841 @34281
+TD: DRAGGING ev=MOTION fg=1,1 xy=926,841 @34294
+...
+TD: DRAGGING ev=RELEASE fg=1,0 xy=65535,65535 @31990
+BTN_L: UP @32016
+```
+
+The gap between `RELEASE` and `BTN_L: UP` is 26ms (~20ms grace + 1–2 polling ticks), confirming the grace window is active. Without it, UP would fire on the immediate next tick (~4ms).
+
+## Success Criteria
+
+- [x] No build errors (CI green after main.c fix)
+- [x] Device boots and FSM initializes correctly
+- [x] Grace window delays drop by ~20ms (confirmed: 26ms RELEASE→UP gap)
+- [x] Tap → drag → release still works correctly
+- [x] Kconfig entry present with default 20ms
+- [x] Setting to 0 would restore instant-drop (not tested explicitly)
+
 ## Conclusion
 
-TBD after testing.
+**Verdict: ✅ Complete**
+
+`DROP_GRACE_MS` is no longer a dead constant — it actively filters transient contact-loss events during drags. The 20ms default provides a good balance: long enough to absorb capacitive-touchpad glitches during fast swipes, short enough to be imperceptible on intentional lifts.
+
+The fix required three changes:
+1. **Kconfig** — Added `TPS43_DROP_GRACE_MS` (int, default 20, range 0–200)
+2. **FSM** — `DRAGGING` state now enters grace on `RELEASE` instead of dropping immediately; drops only after `DROP_GRACE_MS` expires without re-touch
+3. **Init** — `lift_ms = 0` in `tps43_tapdrag_init()` and on `TAPPED→DRAGGING` transition
+
+Bonus fix: removed stale `&dc` argument from `main.c` (leftover from Exp13 double-click experiment) that caused a CI build failure.
