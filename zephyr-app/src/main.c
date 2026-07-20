@@ -238,6 +238,7 @@ int main(void)
 						mouse_buttons &= ~1;
 					}
 					tps43_left_btn_prev = tps43_left_btn;
+					printk("BTN: %s @%llu\n", tps43_left_btn ? "DOWN" : "UP", k_uptime_get());
 				}
 			}
 #elif CONFIG_TPS43_TAP_ENABLE
