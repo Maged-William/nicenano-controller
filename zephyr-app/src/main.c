@@ -226,12 +226,10 @@ int main(void)
 			}
 #if CONFIG_TPS43_TAPDRAG_ENABLE
 			{
-				uint16_t abs_x = ((uint16_t)tps43_regs[TPS43_XABS_HIGH - TPS43_GESTURE0] << 8) |
-				                 tps43_regs[TPS43_XABS_LOW  - TPS43_GESTURE0];
-				uint16_t abs_y = ((uint16_t)tps43_regs[TPS43_YABS_HIGH - TPS43_GESTURE0] << 8) |
-				                 tps43_regs[TPS43_YABS_LOW  - TPS43_GESTURE0];
-				tps43_left_btn = tps43_tapdrag_update(fingers > 0, abs_x, abs_y,
-				                                      k_uptime_get());
+				/* FSM monitors for tap+re-touch and requests a hold if detected.
+				 * OR with the hardware tap bit so single taps still click normally. */
+				bool drag = tps43_tapdrag_update(fingers > 0, k_uptime_get());
+				tps43_left_btn = tap || drag;
 				if (tps43_left_btn != tps43_left_btn_prev) {
 					if (tps43_left_btn) {
 						mouse_buttons |= 1;
