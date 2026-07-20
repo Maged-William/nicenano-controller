@@ -24,6 +24,12 @@
 #define TPS43_STRENGTH_LOW  0x1B
 #define TPS43_TOUCH_AREA   0x1C
 
+/* Configuration registers (0x06xx) */
+#define TPS43_CFG_RESET        0x0600
+#define TPS43_CFG_SF_GESTURE   0x06B7
+#define TPS43_CFG_TAP_TIME     0x06B9
+#define TPS43_CFG_HOLD_TIME    0x06BD
+
 #if CONFIG_TPS43_ENABLE
 
 extern bool tps43_found;
@@ -31,6 +37,8 @@ extern uint8_t tps43_regs[16];
 
 bool tps43_init(const struct device *i2c);
 bool tps43_poll(int16_t *dx, int16_t *dy, bool *tap);
+bool tps43_write_config(uint16_t reg, uint8_t val);
+bool tps43_disable_gestures(void);
 
 #endif
 #endif

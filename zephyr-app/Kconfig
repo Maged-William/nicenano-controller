@@ -268,92 +268,66 @@ config TPS43_TAP_ENABLE
 	help
 	  When enabled, a tap gesture on the touchpad sends left mouse button click.
 
-menu "Tap-and-Drag"
+menu "Soft-Tap FSM (Exp13)"
 	depends on TPS43_ENABLE
 
 config TPS43_TAPDRAG_ENABLE
-	bool "Enable tap-and-drag with drag lock"
-	default n
+	bool "Enable soft-tap FSM (libinput-style)"
+	default y
 	help
-	  Software FSM replaces hardware tap-to-click (TPS43_TAP_ENABLE is
-	  ignored when this is active). Provides tap-and-drag with drag lock:
-	  lift and re-touch within the timeout to continue dragging.
+	  Pure-software tap FSM ported from libinput's evdev-mt-touchpad-tap.c.
+	  Requires TPS43 gesture engine to be disabled (SFGestureEnable=0) so
+	  that FINGER_COUNT stays stable. Replaces CONFIG_TPS43_TAP_ENABLE.
 
-config TPS43_TAP_MOVE_THRESH
-	int "Tap movement threshold (abs counts)"
-	default 120
-	range 1 1000
-	depends on TPS43_TAPDRAG_ENABLE
-	help
-	  Maximum finger movement (in absolute-position counts) during a touch
-	  for it to still be considered a tap. Larger = more tolerant.
-
-config TPS43_SAME_SPOT_THRESH
-	int "Re-touch distance threshold (abs counts)"
-	default 300
-	range 1 1000
-	depends on TPS43_TAPDRAG_ENABLE
-	help
-	  How close the re-touch must land to the tap-up position (in absolute
-	  counts) to arm the drag. Larger = easier to re-arm.
-
-config TPS43_TAP_MAX_TIME
-	int "Tap max hold time (ms)"
-	default 300
-	range 10 1000
-	depends on TPS43_TAPDRAG_ENABLE
-	help
-	  Maximum finger-down duration for a touch to count as a tap.
-	  Longer than this and it's treated as a press/move.
-
-config TPS43_REDOWN_WINDOW
-	int "Tap re-touch window (ms)"
-	default 600
-	range 10 2000
-	depends on TPS43_TAPDRAG_ENABLE
-	help
-	  Timer1: how long the user has to re-touch after a tap to arm a drag.
-	  libinput default: 500ms.
-
-config TPS43_CONFIRM_WINDOW
-	int "Drag confirm window (ms)"
-	default 150
-	range 0 1000
-	depends on TPS43_TAPDRAG_ENABLE
-	help
-	  Timer2: if the finger moves within this window after re-touching,
-	  the drag is confirmed (button stays held). If the finger moves
-	  AFTER this window, the button is released and it becomes a normal
-	  pointer move. Set to 0 to disable and always confirm on any move.
-
-config TPS43_DRAG_LOCK_TIMEOUT
-	int "Drag lock timeout (ms)"
-	default 800
-	range 10 2000
-	depends on TPS43_TAPDRAG_ENABLE
-	help
-	  Timer3: how long the user has to re-touch after lifting mid-drag
-	  to continue dragging without releasing the button.
-
-config TPS43_GLITCH_GRACE_MS
-	int "Gesture0 glitch grace period (ms)"
-	default 150
+config TPS43_TAP_TIMEOUT_MS
+	int "Tap detection timeout (ms)"
+	default 180
 	range 50 500
 	depends on TPS43_TAPDRAG_ENABLE
 	help
-	  When TPS43 gesture0 fires mid-touch, FINGER_COUNT drops to 0 and
-	  the abs registers go to 0xFFFF after ~25ms. During this glitch the
-	  FSM ignores lift signals for this duration, letting the TPS43
-	  recover and finger_count return to normal.
+	  libinput default: 180ms. Maximum finger-down time to qualify as a tap.
+	  Longer = more forgiving of slow taps, but finger-down + hold may
+	  accidentally trigger a tap on release.
 
-config TPS43_ARM_MOVE_THRESH
-	int "Armed state move threshold (abs counts)"
-	default 3
-	range 1 100
+config TPS43_DRAG_TIMEOUT_MS
+	int "Tap-then-drag re-touch window (ms)"
+	default 180
+	range 50 1000
 	depends on TPS43_TAPDRAG_ENABLE
 	help
-	  Minimum finger movement in ST_ARMED before the drag is confirmed
-	  (or cancelled, per CONFIRM_WINDOW logic). Lower = more sensitive.
+	  libinput default: 160ms + 20ms/finger ≈ 180ms.
+	  How long after a tap the user has to touch down again to start
+	  dragging (button stays held between tap and re-touch).
+
+config TPS43_DRAGLOCK_TIMEOUT_MS
+	int "Drag lock re-touch window (ms)"
+	default 300
+	range 50 1000
+	depends on TPS43_TAPDRAG_ENABLE
+	help
+	  libinput default: 300ms. While dragging, if the finger lifts,
+	  this is how long the user has to touch down again to continue
+	  dragging without releasing the button.
+
+config TPS43_TAP_MOVE_THRESH
+	int "Tap movement threshold (abs counts)"
+	default 30
+	range 5 500
+	depends on TPS43_TAPDRAG_ENABLE
+	help
+	  libinput default: 1.3mm (~30 TPS43 abs units).
+	  Maximum finger movement during a touch for it to still count as a tap.
+	  Larger = more tolerant of finger wiggle.
+
+config TPS43_SAME_SPOT_THRESH
+	int "Re-touch same-spot threshold (abs counts)"
+	default 80
+	range 5 500
+	depends on TPS43_TAPDRAG_ENABLE
+	help
+	  How close the re-touch must land to the tap-up position to qualify
+	  as a drag continuation (rather than a new tap). Larger = easier to
+	  re-arm drag.
 
 endmenu
 

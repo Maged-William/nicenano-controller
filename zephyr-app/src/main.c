@@ -52,12 +52,11 @@ static const struct device *i2c_dev;
 
 static bool tps43_left_btn;
 static bool tps43_left_btn_prev;
+static bool tps43_right_btn;
+static bool tps43_right_btn_prev;
 static int16_t tps43_dbg_dx;
 static int16_t tps43_dbg_dy;
 static uint8_t tps43_dbg_fingers;
-static uint8_t tps43_prev_g0;
-static uint8_t tps43_prev_g1;
-static uint8_t tps43_prev_fingers;
 #endif
 
 /* ================================================================
@@ -126,9 +125,12 @@ int main(void)
 #if CONFIG_TPS43_ENABLE
 	tps43_init(i2c_dev);
 	printk("TPS43 touchpad: %s\n", tps43_found ? "found" : "not found");
+	if (tps43_found) {
+		tps43_disable_gestures();
+	}
 #if CONFIG_TPS43_TAPDRAG_ENABLE
 	tps43_tapdrag_init();
-	printk("TPS43 tap-drag FSM: enabled\n");
+	printk("TPS43 soft-tap FSM: enabled\n");
 #endif
 #endif
 
@@ -152,7 +154,7 @@ int main(void)
 		printk("Gyro calibration disabled, using zero offsets\n");
 #endif
 
-	printk("Exp12: Dual-gyro HID mouse + TPS43 tap-drag touchpad at 250Hz\n");
+	printk("Exp13: Dual-gyro HID mouse + TPS43 soft-tap FSM at 250Hz\n");
 	printk("tick\tFX\tFY\tFZ\tCH0\tCH1\tCH2\tCH3\tTP_X\tTP_Y\tTP_F\n");
 
 	int64_t next_tick;
@@ -195,17 +197,8 @@ int main(void)
 			bool touched = tps43_poll(&tdx, &tdy, &tap);
 			tps43_dbg_dx = tdx;
 			tps43_dbg_dy = tdy;
-			uint8_t g0 = tps43_regs[0];
-			uint8_t g1 = tps43_regs[1];
 			uint8_t fingers = tps43_regs[TPS43_FINGER_COUNT - TPS43_GESTURE0];
 			tps43_dbg_fingers = touched ? fingers : 0;
-
-			if (g0 != tps43_prev_g0 || g1 != tps43_prev_g1 || fingers != tps43_prev_fingers) {
-				printk("GST g0=0x%02X g1=0x%02X f=%d\n", g0, g1, fingers);
-				tps43_prev_g0 = g0;
-				tps43_prev_g1 = g1;
-				tps43_prev_fingers = fingers;
-			}
 
 			if (touched) {
 				if (fingers >= 2) {
@@ -230,7 +223,10 @@ int main(void)
 				                  tps43_regs[TPS43_XABS_LOW  - TPS43_GESTURE0];
 				uint16_t abs_y = ((uint16_t)tps43_regs[TPS43_YABS_HIGH - TPS43_GESTURE0] << 8) |
 				                  tps43_regs[TPS43_YABS_LOW  - TPS43_GESTURE0];
-				tps43_left_btn = tps43_tapdrag_update(touched, abs_x, abs_y, k_uptime_get());
+				bool rc = false, dc = false;
+				uint8_t fg = touched ? fingers : 0;
+				tps43_left_btn = tps43_tapdrag_update(touched, fg, abs_x, abs_y, k_uptime_get(), &rc, &dc);
+
 				if (tps43_left_btn != tps43_left_btn_prev) {
 					if (tps43_left_btn) {
 						mouse_buttons |= 1;
@@ -238,7 +234,25 @@ int main(void)
 						mouse_buttons &= ~1;
 					}
 					tps43_left_btn_prev = tps43_left_btn;
-					printk("BTN: %s @%llu\n", tps43_left_btn ? "DOWN" : "UP", k_uptime_get());
+					printk("BTN_L: %s @%llu\n", tps43_left_btn ? "DOWN" : "UP", k_uptime_get());
+				}
+				if (rc) {
+					printk("BTN_R: CLICK @%llu\n", k_uptime_get());
+					mouse_buttons |= 2;
+					send_mouse_report(0, 0, 0, 0);
+					mouse_buttons &= ~2;
+					send_mouse_report(0, 0, 0, 0);
+				}
+				if (dc) {
+					printk("BTN_L: DOUBLE @%llu\n", k_uptime_get());
+					mouse_buttons |= 1;
+					send_mouse_report(0, 0, 0, 0);
+					mouse_buttons &= ~1;
+					send_mouse_report(0, 0, 0, 0);
+					mouse_buttons |= 1;
+					send_mouse_report(0, 0, 0, 0);
+					mouse_buttons &= ~1;
+					send_mouse_report(0, 0, 0, 0);
 				}
 			}
 #elif CONFIG_TPS43_TAP_ENABLE

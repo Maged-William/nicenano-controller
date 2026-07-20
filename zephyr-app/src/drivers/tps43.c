@@ -8,12 +8,28 @@
 
 static const struct device *i2c_dev;
 
-static uint8_t tps43_prev_g0;
-static uint8_t tps43_prev_g1;
-static uint8_t tps43_prev_fingers;
-
 bool tps43_found;
 uint8_t tps43_regs[16];
+
+bool tps43_write_config(uint16_t reg, uint8_t val)
+{
+	uint8_t cmd[3] = { reg >> 8, reg & 0xFF, val };
+	tps43_end_comm();
+	int ret = i2c_write(i2c_dev, cmd, 3, TPS43_ADDR);
+	tps43_end_comm();
+	return ret == 0;
+}
+
+bool tps43_disable_gestures(void)
+{
+	if (!tps43_found)
+		return false;
+	/* SFGestureEnable: write 0 to disable all native gesture processing */
+	if (!tps43_write_config(TPS43_CFG_SF_GESTURE, 0x00))
+		return false;
+	printk("TPS43 gesture engine disabled\n");
+	return true;
+}
 
 bool tps43_init(const struct device *i2c)
 {
