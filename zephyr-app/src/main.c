@@ -208,14 +208,11 @@ int main(void)
 			uint8_t fingers = tps43_regs[TPS43_FINGER_COUNT - TPS43_GESTURE0];
 			tps43_dbg_fingers = touched ? fingers : 0;
 
-			/* Absolute position (used by edge scroll and tap FSM) */
-			uint16_t abs_x = 0, abs_y = 0;
-			if (touched) {
-				abs_x = ((uint16_t)tps43_regs[TPS43_XABS_HIGH - TPS43_GESTURE0] << 8) |
-				         tps43_regs[TPS43_XABS_LOW  - TPS43_GESTURE0];
-				abs_y = ((uint16_t)tps43_regs[TPS43_YABS_HIGH - TPS43_GESTURE0] << 8) |
-				         tps43_regs[TPS43_YABS_LOW  - TPS43_GESTURE0];
-			}
+			/* Absolute position (always read from registers; persists after lift) */
+			uint16_t abs_x = ((uint16_t)tps43_regs[TPS43_XABS_HIGH - TPS43_GESTURE0] << 8) |
+			                  tps43_regs[TPS43_XABS_LOW  - TPS43_GESTURE0];
+			uint16_t abs_y = ((uint16_t)tps43_regs[TPS43_YABS_HIGH - TPS43_GESTURE0] << 8) |
+			                  tps43_regs[TPS43_YABS_LOW  - TPS43_GESTURE0];
 			tps43_dbg_abs_x = abs_x;
 			tps43_dbg_abs_y = abs_y;
 
@@ -227,11 +224,11 @@ int main(void)
 					uint32_t eb_thresh = (uint32_t)CONFIG_TPS43_ABS_MAX_Y * (100 - CONFIG_TPS43_EDGE_BOTTOM_PCT) / 100;
 
 					if (abs_x > er_thresh) {
-						mouse_wheel += (int)((float)tdy * TPS43_SCROLL_SENS);
+						mouse_wheel += (int)((float)tdy * TPS43_SCROLL_SENS * 0.1f);
 						edge_scroll = true;
 					}
 					if (abs_y > eb_thresh) {
-						mouse_wheel_h += (int)((float)tdx * TPS43_SCROLL_SENS);
+						mouse_wheel_h += (int)((float)tdx * TPS43_SCROLL_SENS * 0.1f);
 						edge_scroll = true;
 					}
 				}
