@@ -224,12 +224,12 @@ config TPS43_ENABLE
 
 config TPS43_SENSITIVITY_NUM
 	int "Touchpad sensitivity numerator"
-	default 5
+	default 12
 	range 1 100
 	depends on TPS43_ENABLE
 	help
 	  Effective sensitivity = NUM / DENOM. Raw touchpad delta is multiplied
-	  by this factor before adding to the mouse accumulator. 5/2 = 2.5x.
+	  by this factor before adding to the mouse accumulator. 12/2 = 6x.
 
 config TPS43_SENSITIVITY_DENOM
 	int "Touchpad sensitivity denominator"
@@ -290,7 +290,7 @@ config TPS43_TAP_MOVE_THRESH
 
 config TPS43_SAME_SPOT_THRESH
 	int "Re-touch distance threshold (abs counts)"
-	default 200
+	default 300
 	range 1 1000
 	depends on TPS43_TAPDRAG_ENABLE
 	help
@@ -299,7 +299,7 @@ config TPS43_SAME_SPOT_THRESH
 
 config TPS43_TAP_MAX_TIME
 	int "Tap max hold time (ms)"
-	default 200
+	default 300
 	range 10 1000
 	depends on TPS43_TAPDRAG_ENABLE
 	help
@@ -308,7 +308,7 @@ config TPS43_TAP_MAX_TIME
 
 config TPS43_REDOWN_WINDOW
 	int "Tap re-touch window (ms)"
-	default 400
+	default 600
 	range 10 2000
 	depends on TPS43_TAPDRAG_ENABLE
 	help
@@ -328,7 +328,7 @@ config TPS43_CONFIRM_WINDOW
 
 config TPS43_DRAG_LOCK_TIMEOUT
 	int "Drag lock timeout (ms)"
-	default 500
+	default 800
 	range 10 2000
 	depends on TPS43_TAPDRAG_ENABLE
 	help
