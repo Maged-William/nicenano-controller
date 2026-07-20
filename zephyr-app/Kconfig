@@ -281,7 +281,7 @@ config TPS43_TAPDRAG_ENABLE
 
 config TPS43_TAP_MOVE_THRESH
 	int "Tap movement threshold (abs counts)"
-	default 60
+	default 120
 	range 1 1000
 	depends on TPS43_TAPDRAG_ENABLE
 	help
@@ -290,7 +290,7 @@ config TPS43_TAP_MOVE_THRESH
 
 config TPS43_SAME_SPOT_THRESH
 	int "Re-touch distance threshold (abs counts)"
-	default 80
+	default 200
 	range 1 1000
 	depends on TPS43_TAPDRAG_ENABLE
 	help

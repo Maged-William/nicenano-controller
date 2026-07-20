@@ -282,7 +282,7 @@ int main(void)
 			int16_t ch1 = ads1015_read_channel(1);
 			int16_t ch2 = ads1015_read_channel(2);
 			int16_t ch3 = ads1015_read_channel(3);
-			printk("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
+			printk("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
 			       tick_count, (int)fx, (int)fy, (int)fz,
 			       ch0, ch1, ch2, ch3,
 #if CONFIG_TPS43_ENABLE
