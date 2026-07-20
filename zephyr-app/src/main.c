@@ -52,8 +52,6 @@ static const struct device *i2c_dev;
 
 static bool tps43_left_btn;
 static bool tps43_left_btn_prev;
-static bool tps43_right_btn;
-static bool tps43_right_btn_prev;
 static int16_t tps43_dbg_dx;
 static int16_t tps43_dbg_dy;
 static uint8_t tps43_dbg_fingers;
@@ -65,9 +63,6 @@ static uint8_t tps43_dbg_fingers;
 
 int main(void)
 {
-	const struct device *cdc = DEVICE_DT_GET(DT_NODELABEL(cdc_acm_uart0));
-	uint32_t dtr = 0;
-
 	const struct device *gpio0 = DEVICE_DT_GET(DT_NODELABEL(gpio0));
 	gpio_pin_configure(gpio0, 15, GPIO_OUTPUT_ACTIVE);
 	gpio_pin_configure(gpio0, CS1_PIN, GPIO_OUTPUT_ACTIVE);
@@ -98,10 +93,14 @@ int main(void)
 	usb_enable(NULL);
 
 #if CONFIG_GYRO_MOUSE_DTR_TIMEOUT_MS > 0
-	int dtr_polls = CONFIG_GYRO_MOUSE_DTR_TIMEOUT_MS / 100;
-	while (!dtr && dtr_polls-- > 0) {
-		uart_line_ctrl_get(cdc, UART_LINE_CTRL_DTR, &dtr);
-		k_sleep(K_MSEC(100));
+	{
+		const struct device *cdc = DEVICE_DT_GET(DT_NODELABEL(cdc_acm_uart0));
+		uint32_t dtr = 0;
+		int dtr_polls = CONFIG_GYRO_MOUSE_DTR_TIMEOUT_MS / 100;
+		while (!dtr && dtr_polls-- > 0) {
+			uart_line_ctrl_get(cdc, UART_LINE_CTRL_DTR, &dtr);
+			k_sleep(K_MSEC(100));
+		}
 	}
 #endif
 

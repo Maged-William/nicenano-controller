@@ -11,6 +11,20 @@ static const struct device *i2c_dev;
 bool tps43_found;
 uint8_t tps43_regs[16];
 
+/* ─── Low-level I2C helpers ─────────────────────── */
+
+static int tps43_end_comm(void)
+{
+	uint8_t end_cmd[3] = { 0xEE, 0xEE, 0x00 };
+	return i2c_write(i2c_dev, end_cmd, 3, TPS43_ADDR);
+}
+
+static int tps43_read_block(uint8_t *buf)
+{
+	uint8_t reg_ptr[2] = { 0x00, TPS43_GESTURE0 };
+	return i2c_write_read(i2c_dev, TPS43_ADDR, reg_ptr, 2, buf, 16);
+}
+
 bool tps43_write_config(uint16_t reg, uint8_t val)
 {
 	uint8_t cmd[3] = { reg >> 8, reg & 0xFF, val };
@@ -24,7 +38,6 @@ bool tps43_disable_gestures(void)
 {
 	if (!tps43_found)
 		return false;
-	/* SFGestureEnable: write 0 to disable all native gesture processing */
 	if (!tps43_write_config(TPS43_CFG_SF_GESTURE, 0x00))
 		return false;
 	printk("TPS43 gesture engine disabled\n");
@@ -56,18 +69,6 @@ bool tps43_init(const struct device *i2c)
 	}
 
 	return tps43_found;
-}
-
-static int tps43_read_block(uint8_t *buf)
-{
-	uint8_t reg_ptr[2] = { 0x00, TPS43_GESTURE0 };
-	return i2c_write_read(i2c_dev, TPS43_ADDR, reg_ptr, 2, buf, 16);
-}
-
-static int tps43_end_comm(void)
-{
-	uint8_t end_cmd[3] = { 0xEE, 0xEE, 0x00 };
-	return i2c_write(i2c_dev, end_cmd, 3, TPS43_ADDR);
 }
 
 bool tps43_poll(int16_t *dx, int16_t *dy, bool *tap)
