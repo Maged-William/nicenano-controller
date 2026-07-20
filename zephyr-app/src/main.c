@@ -57,6 +57,8 @@ static int16_t tps43_dbg_dy;
 static uint8_t tps43_dbg_fingers;
 static uint16_t tps43_dbg_abs_x;
 static uint16_t tps43_dbg_abs_y;
+static bool tps43_prev_touched;
+static bool tps43_edge_scroll_mode;
 #endif
 
 /* ================================================================
@@ -218,21 +220,23 @@ int main(void)
 
 			if (touched) {
 #if CONFIG_TPS43_EDGESCROLL_ENABLE
-				bool edge_scroll = false;
-				{
+				/* Lock edge-scroll mode on touch start based on starting position */
+				if (touched && !tps43_prev_touched) {
 					uint32_t er_thresh = (uint32_t)CONFIG_TPS43_ABS_MAX_X * (100 - CONFIG_TPS43_EDGE_RIGHT_PCT) / 100;
 					uint32_t eb_thresh = (uint32_t)CONFIG_TPS43_ABS_MAX_Y * (100 - CONFIG_TPS43_EDGE_BOTTOM_PCT) / 100;
+					tps43_edge_scroll_mode = (abs_x > er_thresh) || (abs_y > eb_thresh);
+				}
 
+				if (tps43_edge_scroll_mode) {
+					uint32_t er_thresh = (uint32_t)CONFIG_TPS43_ABS_MAX_X * (100 - CONFIG_TPS43_EDGE_RIGHT_PCT) / 100;
+					uint32_t eb_thresh = (uint32_t)CONFIG_TPS43_ABS_MAX_Y * (100 - CONFIG_TPS43_EDGE_BOTTOM_PCT) / 100;
 					if (abs_x > er_thresh) {
 						mouse_wheel += (int)((float)tdy * TPS43_SCROLL_SENS * 0.1f);
-						edge_scroll = true;
 					}
 					if (abs_y > eb_thresh) {
 						mouse_wheel_h += (int)((float)tdx * TPS43_SCROLL_SENS * 0.1f);
-						edge_scroll = true;
 					}
-				}
-				if (!edge_scroll) {
+				} else {
 					float mv_x = (float)tdx * TPS43_SENS;
 					float mv_y = (float)tdy * TPS43_SENS;
 #if CONFIG_TPS43_INVERT_X
@@ -244,6 +248,7 @@ int main(void)
 					mouse_acc_x += mv_x;
 					mouse_acc_y += mv_y;
 				}
+				tps43_prev_touched = touched;
 #else
 				if (fingers >= 2) {
 					mouse_wheel   += (int)((float)tdy * TPS43_SCROLL_SENS);
@@ -262,6 +267,13 @@ int main(void)
 				}
 #endif
 			}
+#if CONFIG_TPS43_EDGESCROLL_ENABLE
+			else if (tps43_prev_touched && !touched) {
+				/* Clear mode on lift */
+				tps43_edge_scroll_mode = false;
+				tps43_prev_touched = false;
+			}
+#endif
 #if CONFIG_TPS43_TAPDRAG_ENABLE
 			{
 				bool rc = false;
