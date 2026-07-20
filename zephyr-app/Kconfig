@@ -224,7 +224,7 @@ config TPS43_ENABLE
 
 config TPS43_SENSITIVITY_NUM
 	int "Touchpad sensitivity numerator"
-	default 12
+	default 6
 	range 1 100
 	depends on TPS43_ENABLE
 	help
