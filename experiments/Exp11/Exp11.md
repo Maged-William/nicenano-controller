@@ -138,3 +138,7 @@ tick  FX  FY  FZ  CH0  CH1  CH2  CH3  TP_X  TP_Y  TP_F
 ### What didn't work
 
 **Tap-and-drag** proved unreliable on this hardware. The TPS43 absolute X/Y registers don't track finger position consistently enough for position-delta-based drag detection, and altering the I2C init sequence from `i2c_write_read` to a simple probe broke detection entirely. A future experiment could revisit drag with a timer-only approach (no absolute position), or by using relative delta integration to track movement from tap origin.
+
+### Late addition: Background retry on init failure
+
+When the TPS43 doesn't respond during boot init (e.g., not yet powered/ready), `tps43_poll()` now attempts a lightweight probe every 4ms tick without blocking the main loop (`tps43.c:59-72`). Once the sensor becomes ready and the probe succeeds, it sets `tps43_found = true` and a `"TPS43 touchpad: found (late init)"` message appears in the serial output — no reboot required. This covers the common case where the sensor is physically connected but takes longer than the boot retry window (~1s) to initialize.
