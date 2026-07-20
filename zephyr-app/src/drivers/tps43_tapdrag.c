@@ -46,7 +46,7 @@ static uint64_t lift_ms;
 static bool button_down;
 
 static enum tap_state prev_state = 0xff;
-static uint8_t prev_fg_count = 0xff;
+static uint8_t prev_fg_count;
 
 /* ─── Helpers ─────────────────────────────────────────────── */
 
