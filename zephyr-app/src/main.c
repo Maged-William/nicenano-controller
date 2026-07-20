@@ -13,6 +13,7 @@
 #include "drivers/ads1015.h"
 #include "drivers/bmi160.h"
 #include "drivers/tps43.h"
+#include "drivers/tps43_tapdrag.h"
 #include "alg/calibrate.h"
 #include "alg/fusion.h"
 
@@ -125,6 +126,10 @@ int main(void)
 #if CONFIG_TPS43_ENABLE
 	tps43_init(i2c_dev);
 	printk("TPS43 touchpad: %s\n", tps43_found ? "found" : "not found");
+#if CONFIG_TPS43_TAPDRAG_ENABLE
+	tps43_tapdrag_init();
+	printk("TPS43 tap-drag FSM: enabled\n");
+#endif
 #endif
 
 	bool bmi1 = bmi160_sensor_init(CS1_PIN, S1_GYRO_RANGE_REG);
@@ -219,7 +224,24 @@ int main(void)
 					mouse_acc_y += mv_y;
 				}
 			}
-#if CONFIG_TPS43_TAP_ENABLE
+#if CONFIG_TPS43_TAPDRAG_ENABLE
+			{
+				uint16_t abs_x = ((uint16_t)tps43_regs[TPS43_XABS_HIGH - TPS43_GESTURE0] << 8) |
+				                 tps43_regs[TPS43_XABS_LOW  - TPS43_GESTURE0];
+				uint16_t abs_y = ((uint16_t)tps43_regs[TPS43_YABS_HIGH - TPS43_GESTURE0] << 8) |
+				                 tps43_regs[TPS43_YABS_LOW  - TPS43_GESTURE0];
+				tps43_left_btn = tps43_tapdrag_update(fingers > 0, abs_x, abs_y,
+				                                      k_uptime_get());
+				if (tps43_left_btn != tps43_left_btn_prev) {
+					if (tps43_left_btn) {
+						mouse_buttons |= 1;
+					} else {
+						mouse_buttons &= ~1;
+					}
+					tps43_left_btn_prev = tps43_left_btn;
+				}
+			}
+#elif CONFIG_TPS43_TAP_ENABLE
 			tps43_left_btn = tap;
 			if (tps43_left_btn != tps43_left_btn_prev) {
 				if (tps43_left_btn) {

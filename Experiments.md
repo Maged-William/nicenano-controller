@@ -13,3 +13,4 @@
 | Exp09 | ✅ Complete | BMI160 gyro + accel over SPI — port from PlatformIO to Zephyr RTOS |
 | Exp10 | ✅ Complete | Dual-gyro HID mouse via saturation-weighted crossfade — Alpakka-style fusion with burst averaging, startup calibration, deadzone, 30+ Kconfigs |
 | Exp11 | ✅ Complete | TPS43 touchpad integration — I2C polling, 2-finger scroll (V+H), tap-to-click, configurable sensitivity, combined gyro+touchpad HID mouse |
+| Exp12 | 🔄 In Progress | Tap-and-drag (drag lock) FSM for TPS43 — libinput-style state machine with confirm window, replaces hardware tap-to-click |

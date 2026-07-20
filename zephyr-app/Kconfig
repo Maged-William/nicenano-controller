@@ -268,6 +268,75 @@ config TPS43_TAP_ENABLE
 	help
 	  When enabled, a tap gesture on the touchpad sends left mouse button click.
 
+menu "Tap-and-Drag"
+	depends on TPS43_ENABLE
+
+config TPS43_TAPDRAG_ENABLE
+	bool "Enable tap-and-drag with drag lock"
+	default n
+	help
+	  Software FSM replaces hardware tap-to-click (TPS43_TAP_ENABLE is
+	  ignored when this is active). Provides tap-and-drag with drag lock:
+	  lift and re-touch within the timeout to continue dragging.
+
+config TPS43_TAP_MOVE_THRESH
+	int "Tap movement threshold (abs counts)"
+	default 60
+	range 1 1000
+	depends on TPS43_TAPDRAG_ENABLE
+	help
+	  Maximum finger movement (in absolute-position counts) during a touch
+	  for it to still be considered a tap. Larger = more tolerant.
+
+config TPS43_SAME_SPOT_THRESH
+	int "Re-touch distance threshold (abs counts)"
+	default 80
+	range 1 1000
+	depends on TPS43_TAPDRAG_ENABLE
+	help
+	  How close the re-touch must land to the tap-up position (in absolute
+	  counts) to arm the drag. Larger = easier to re-arm.
+
+config TPS43_TAP_MAX_TIME
+	int "Tap max hold time (ms)"
+	default 200
+	range 10 1000
+	depends on TPS43_TAPDRAG_ENABLE
+	help
+	  Maximum finger-down duration for a touch to count as a tap.
+	  Longer than this and it's treated as a press/move.
+
+config TPS43_REDOWN_WINDOW
+	int "Tap re-touch window (ms)"
+	default 400
+	range 10 2000
+	depends on TPS43_TAPDRAG_ENABLE
+	help
+	  Timer1: how long the user has to re-touch after a tap to arm a drag.
+	  libinput default: 500ms.
+
+config TPS43_CONFIRM_WINDOW
+	int "Drag confirm window (ms)"
+	default 150
+	range 0 1000
+	depends on TPS43_TAPDRAG_ENABLE
+	help
+	  Timer2: if the finger moves within this window after re-touching,
+	  the drag is confirmed (button stays held). If the finger moves
+	  AFTER this window, the button is released and it becomes a normal
+	  pointer move. Set to 0 to disable and always confirm on any move.
+
+config TPS43_DRAG_LOCK_TIMEOUT
+	int "Drag lock timeout (ms)"
+	default 500
+	range 10 2000
+	depends on TPS43_TAPDRAG_ENABLE
+	help
+	  Timer3: how long the user has to re-touch after lifting mid-drag
+	  to continue dragging without releasing the button.
+
+endmenu
+
 config TPS43_DEBUG
 	bool "Print touchpad register dump on every tick"
 	default n
