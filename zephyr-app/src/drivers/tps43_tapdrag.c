@@ -1,4 +1,5 @@
 #include <zephyr/kernel.h>
+#include <zephyr/sys/printk.h>
 #include "tps43_tapdrag.h"
 
 #if CONFIG_TPS43_ENABLE && CONFIG_TPS43_TAPDRAG_ENABLE
@@ -23,6 +24,8 @@ static uint16_t last_x;
 static uint16_t last_y;
 static bool pos_cached;
 static bool click_pulse_done;
+static enum drag_state prev_state = 0xff;
+static bool prev_finger_down;
 
 void tps43_tapdrag_init(void)
 {
@@ -38,6 +41,17 @@ static inline uint32_t abs_diff(uint16_t a, uint16_t b)
 
 bool tps43_tapdrag_update(bool finger_down, uint16_t abs_x, uint16_t abs_y, uint64_t now_ms)
 {
+	if (state != prev_state) {
+		printk("TD: %d->%d fd=%d xy=%u,%u @%llu\n",
+		       prev_state, state, finger_down, abs_x, abs_y, now_ms);
+		prev_state = state;
+	}
+	if (finger_down != prev_finger_down) {
+		printk("TD: fd %d->%d xy=%u,%u @%llu\n",
+		       prev_finger_down, finger_down, abs_x, abs_y, now_ms);
+		prev_finger_down = finger_down;
+	}
+
 	switch (state) {
 
 	case ST_IDLE:
