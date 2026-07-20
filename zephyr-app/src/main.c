@@ -137,9 +137,11 @@ int main(void)
 #endif
 #if CONFIG_TPS43_EDGESCROLL_ENABLE
 	{
+		uint32_t el = (uint32_t)CONFIG_TPS43_ABS_MAX_X * CONFIG_TPS43_EDGE_LEFT_PCT / 100;
 		uint32_t er = (uint32_t)CONFIG_TPS43_ABS_MAX_X * (100 - CONFIG_TPS43_EDGE_RIGHT_PCT) / 100;
+		uint32_t et = (uint32_t)CONFIG_TPS43_ABS_MAX_Y * CONFIG_TPS43_EDGE_TOP_PCT / 100;
 		uint32_t eb = (uint32_t)CONFIG_TPS43_ABS_MAX_Y * (100 - CONFIG_TPS43_EDGE_BOTTOM_PCT) / 100;
-		printk("TPS43 edge scroll: right X>%u, bottom Y>%u\n", er, eb);
+		printk("TPS43 edge scroll: L<%u R>%u T<%u B>%u\n", el, er, et, eb);
 	}
 #endif
 #endif
@@ -220,22 +222,45 @@ int main(void)
 
 			if (touched) {
 #if CONFIG_TPS43_EDGESCROLL_ENABLE
-				/* Lock edge-scroll mode on touch start based on starting position */
+				uint32_t el = (uint32_t)CONFIG_TPS43_ABS_MAX_X * CONFIG_TPS43_EDGE_LEFT_PCT / 100;
+				uint32_t er = (uint32_t)CONFIG_TPS43_ABS_MAX_X * (100 - CONFIG_TPS43_EDGE_RIGHT_PCT) / 100;
+				uint32_t et = (uint32_t)CONFIG_TPS43_ABS_MAX_Y * CONFIG_TPS43_EDGE_TOP_PCT / 100;
+				uint32_t eb = (uint32_t)CONFIG_TPS43_ABS_MAX_Y * (100 - CONFIG_TPS43_EDGE_BOTTOM_PCT) / 100;
+
 				if (touched && !tps43_prev_touched) {
-					uint32_t er_thresh = (uint32_t)CONFIG_TPS43_ABS_MAX_X * (100 - CONFIG_TPS43_EDGE_RIGHT_PCT) / 100;
-					uint32_t eb_thresh = (uint32_t)CONFIG_TPS43_ABS_MAX_Y * (100 - CONFIG_TPS43_EDGE_BOTTOM_PCT) / 100;
-					tps43_edge_scroll_mode = (abs_x > er_thresh) || (abs_y > eb_thresh);
+					tps43_edge_scroll_mode =
+						(CONFIG_TPS43_EDGE_LEFT_PCT > 0 && abs_x < el) ||
+						(CONFIG_TPS43_EDGE_RIGHT_PCT > 0 && abs_x > er) ||
+						(CONFIG_TPS43_EDGE_TOP_PCT > 0 && abs_y < et) ||
+						(CONFIG_TPS43_EDGE_BOTTOM_PCT > 0 && abs_y > eb);
 				}
 
 				if (tps43_edge_scroll_mode) {
-					uint32_t er_thresh = (uint32_t)CONFIG_TPS43_ABS_MAX_X * (100 - CONFIG_TPS43_EDGE_RIGHT_PCT) / 100;
-					uint32_t eb_thresh = (uint32_t)CONFIG_TPS43_ABS_MAX_Y * (100 - CONFIG_TPS43_EDGE_BOTTOM_PCT) / 100;
-					if (abs_x > er_thresh) {
-						mouse_wheel += (int)((float)tdy * TPS43_SCROLL_SENS * 0.1f);
-					}
-					if (abs_y > eb_thresh) {
-						mouse_wheel_h += (int)((float)tdx * TPS43_SCROLL_SENS * 0.1f);
-					}
+					float sv = 0, sh = 0;
+
+#define EDGE_CONTRIB(pct, th, axis, num, denom, inv, dx, dy) \
+	if (pct > 0 && th) { \
+		float _sp = (float)num / (float)denom; \
+		if (axis == 0) { \
+			float _v = (float)dy * _sp; \
+			if (inv) _v = -_v; \
+			sv += _v; \
+		} else { \
+			float _v = (float)dx * _sp; \
+			if (inv) _v = -_v; \
+			sh += _v; \
+		} \
+	}
+
+					EDGE_CONTRIB(CONFIG_TPS43_EDGE_LEFT_PCT,   abs_x < el, CONFIG_TPS43_EDGE_LEFT_AXIS,   CONFIG_TPS43_EDGE_LEFT_SPEED_NUM,   CONFIG_TPS43_EDGE_LEFT_SPEED_DENOM,   CONFIG_TPS43_EDGE_LEFT_INVERT,   tdx, tdy)
+					EDGE_CONTRIB(CONFIG_TPS43_EDGE_RIGHT_PCT,  abs_x > er, CONFIG_TPS43_EDGE_RIGHT_AXIS,  CONFIG_TPS43_EDGE_RIGHT_SPEED_NUM,  CONFIG_TPS43_EDGE_RIGHT_SPEED_DENOM,  CONFIG_TPS43_EDGE_RIGHT_INVERT,  tdx, tdy)
+					EDGE_CONTRIB(CONFIG_TPS43_EDGE_TOP_PCT,    abs_y < et, CONFIG_TPS43_EDGE_TOP_AXIS,    CONFIG_TPS43_EDGE_TOP_SPEED_NUM,   CONFIG_TPS43_EDGE_TOP_SPEED_DENOM,   CONFIG_TPS43_EDGE_TOP_INVERT,    tdx, tdy)
+					EDGE_CONTRIB(CONFIG_TPS43_EDGE_BOTTOM_PCT, abs_y > eb, CONFIG_TPS43_EDGE_BOTTOM_AXIS, CONFIG_TPS43_EDGE_BOTTOM_SPEED_NUM, CONFIG_TPS43_EDGE_BOTTOM_SPEED_DENOM, CONFIG_TPS43_EDGE_BOTTOM_INVERT, tdx, tdy)
+
+#undef EDGE_CONTRIB
+
+					mouse_wheel   += (int)sv;
+					mouse_wheel_h += (int)sh;
 				} else {
 					float mv_x = (float)tdx * TPS43_SENS;
 					float mv_y = (float)tdy * TPS43_SENS;
@@ -269,7 +294,6 @@ int main(void)
 			}
 #if CONFIG_TPS43_EDGESCROLL_ENABLE
 			else if (tps43_prev_touched && !touched) {
-				/* Clear mode on lift */
 				tps43_edge_scroll_mode = false;
 				tps43_prev_touched = false;
 			}

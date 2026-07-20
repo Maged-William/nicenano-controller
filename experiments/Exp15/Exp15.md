@@ -39,26 +39,43 @@ Edge zones are defined as a configurable percentage from the right/bottom edge, 
 
 | Entry | Default | Range | Purpose |
 |-------|---------|-------|---------|
-| `TPS43_EDGESCROLL_ENABLE` | n | - | Master enable for 1-finger edge scroll |
-| `TPS43_ABS_MAX_X` | 1024 | 1–65535 | Max absolute X value the touchpad reports |
-| `TPS43_ABS_MAX_Y` | 1024 | 1–65535 | Max absolute Y value the touchpad reports |
-| `TPS43_EDGE_RIGHT_PCT` | 15 | 3–50 | % from right edge where vertical scroll activates |
-| `TPS43_EDGE_BOTTOM_PCT` | 15 | 3–50 | % from bottom edge where horizontal scroll activates |
+| `TPS43_EDGESCROLL_ENABLE` | n | - | Master enable |
+| `TPS43_ABS_MAX_X` | 1024 | 1–65535 | Max absolute X |
+| `TPS43_ABS_MAX_Y` | 1024 | 1–65535 | Max absolute Y |
+| `TPS43_EDGE_LEFT_PCT` | 0 | 0–50 | Left zone width (0=disabled) |
+| `TPS43_EDGE_LEFT_AXIS` | 1 (X) | 0=Y, 1=X | Left scroll axis |
+| `TPS43_EDGE_LEFT_SPEED_NUM/DENOM` | 1/10 | 1–100 | Left scroll speed |
+| `TPS43_EDGE_LEFT_INVERT` | n | - | Invert left scroll |
+| `TPS43_EDGE_RIGHT_PCT` | 15 | 0–50 | Right zone width |
+| `TPS43_EDGE_RIGHT_AXIS` | 0 (Y) | 0=Y, 1=X | Right scroll axis |
+| `TPS43_EDGE_RIGHT_SPEED_NUM/DENOM` | 1/10 | 1–100 | Right scroll speed |
+| `TPS43_EDGE_RIGHT_INVERT` | n | - | Invert right scroll |
+| `TPS43_EDGE_TOP_PCT` | 0 | 0–50 | Top zone height |
+| `TPS43_EDGE_TOP_AXIS` | 1 (X) | 0=Y, 1=X | Top scroll axis |
+| `TPS43_EDGE_TOP_SPEED_NUM/DENOM` | 1/10 | 1–100 | Top scroll speed |
+| `TPS43_EDGE_TOP_INVERT` | n | - | Invert top scroll |
+| `TPS43_EDGE_BOTTOM_PCT` | 15 | 0–50 | Bottom zone height |
+| `TPS43_EDGE_BOTTOM_AXIS` | 0 (Y) | 0=Y, 1=X | Bottom scroll axis |
+| `TPS43_EDGE_BOTTOM_SPEED_NUM/DENOM` | 1/10 | 1–100 | Bottom scroll speed |
+| `TPS43_EDGE_BOTTOM_INVERT` | n | - | Invert bottom scroll |
 
 ### Behavior
 
 When `TPS43_EDGESCROLL_ENABLE=y`:
-- 1-finger in right edge → vertical scroll (tdy → mouse_wheel)
-- 1-finger in bottom edge → horizontal scroll (tdx → mouse_wheel_h)
+- Touch starts in any edge zone (pct>0) → scroll mode for the whole gesture
+- Each tick: all active zones contribute to V/H scroll accumulators (dynamic position)
+- Each edge has its own: axis, speed, invert
 - 1-finger in center → pointer motion
-- 2-finger scroll **disabled** (edge scroll replaces it)
+- 2-finger scroll **disabled**
 - Taps/clicks/drags work normally (FSM unchanged)
 
 ### Success Criteria
 
 - [ ] 1-finger on right edge → vertical scroll (up/down)
 - [ ] 1-finger on bottom edge → horizontal scroll (left/right)
-- [ ] 1-finger in center → pointer motion (unchanged)
-- [ ] 2-finger scroll disabled when edge scroll enabled
-- [ ] Taps/clicks/drags still work in edge zone (FSM unchanged)
+- [ ] 1-finger on left/top edges → configurable scroll
+- [ ] Scroll speed configurable per edge
+- [ ] Scroll axis configurable per edge (Y or X)
+- [ ] Scroll direction invertible per edge
+- [ ] Center → pointer, taps, drags all work
 - [ ] CI build passes with no warnings

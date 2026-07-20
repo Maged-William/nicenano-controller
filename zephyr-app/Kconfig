@@ -380,19 +380,125 @@ config TPS43_ABS_MAX_Y
 	help
 	  Maximum absolute Y value the touchpad can report.
 
+menu "Left Edge"
+
+config TPS43_EDGE_LEFT_PCT
+	int "Left edge zone width (%)"
+	default 0
+	range 0 50
+	help
+	  0 = disabled.
+
+config TPS43_EDGE_LEFT_AXIS
+	int "Scroll axis (0=Y/vertical, 1=X/horizontal)"
+	default 1
+	range 0 1
+
+config TPS43_EDGE_LEFT_SPEED_NUM
+	int "Speed numerator"
+	default 1
+	range 1 100
+
+config TPS43_EDGE_LEFT_SPEED_DENOM
+	int "Speed denominator"
+	default 10
+	range 1 100
+
+config TPS43_EDGE_LEFT_INVERT
+	bool "Invert scroll direction"
+	default n
+
+endmenu
+
+menu "Right Edge"
+
 config TPS43_EDGE_RIGHT_PCT
 	int "Right edge zone width (%)"
 	default 15
-	range 3 50
+	range 0 50
 	help
-	  Percentage from the right edge where vertical scroll activates.
+	  0 = disabled.
+
+config TPS43_EDGE_RIGHT_AXIS
+	int "Scroll axis (0=Y/vertical, 1=X/horizontal)"
+	default 0
+	range 0 1
+
+config TPS43_EDGE_RIGHT_SPEED_NUM
+	int "Speed numerator"
+	default 1
+	range 1 100
+
+config TPS43_EDGE_RIGHT_SPEED_DENOM
+	int "Speed denominator"
+	default 10
+	range 1 100
+
+config TPS43_EDGE_RIGHT_INVERT
+	bool "Invert scroll direction"
+	default n
+
+endmenu
+
+menu "Top Edge"
+
+config TPS43_EDGE_TOP_PCT
+	int "Top edge zone height (%)"
+	default 0
+	range 0 50
+	help
+	  0 = disabled.
+
+config TPS43_EDGE_TOP_AXIS
+	int "Scroll axis (0=Y/vertical, 1=X/horizontal)"
+	default 1
+	range 0 1
+
+config TPS43_EDGE_TOP_SPEED_NUM
+	int "Speed numerator"
+	default 1
+	range 1 100
+
+config TPS43_EDGE_TOP_SPEED_DENOM
+	int "Speed denominator"
+	default 10
+	range 1 100
+
+config TPS43_EDGE_TOP_INVERT
+	bool "Invert scroll direction"
+	default n
+
+endmenu
+
+menu "Bottom Edge"
 
 config TPS43_EDGE_BOTTOM_PCT
 	int "Bottom edge zone height (%)"
 	default 15
-	range 3 50
+	range 0 50
 	help
-	  Percentage from the bottom edge where horizontal scroll activates.
+	  0 = disabled.
+
+config TPS43_EDGE_BOTTOM_AXIS
+	int "Scroll axis (0=Y/vertical, 1=X/horizontal)"
+	default 0
+	range 0 1
+
+config TPS43_EDGE_BOTTOM_SPEED_NUM
+	int "Speed numerator"
+	default 1
+	range 1 100
+
+config TPS43_EDGE_BOTTOM_SPEED_DENOM
+	int "Speed denominator"
+	default 10
+	range 1 100
+
+config TPS43_EDGE_BOTTOM_INVERT
+	bool "Invert scroll direction"
+	default n
+
+endmenu
 
 endif
 endmenu
