@@ -338,6 +338,16 @@ config TPS43_SAME_SPOT_THRESH
 	  as a drag continuation (rather than a new tap). Larger = easier to
 	  re-arm drag.
 
+config TPS43_DROP_GRACE_MS
+	int "Drop grace period (ms)"
+	default 20
+	range 0 200
+	depends on TPS43_TAPDRAG_ENABLE
+	help
+	  When dragging, the finger may briefly lose contact with the touchpad
+	  (transient). This grace period keeps the drag button held while waiting
+	  for the finger to return. 0 = disabled (instant drop on release).
+
 endmenu
 
 config TPS43_DEBUG

@@ -15,3 +15,4 @@
 | Exp11 | ✅ Complete | TPS43 touchpad integration — I2C polling, 2-finger scroll (V+H), tap-to-click, configurable sensitivity, combined gyro+touchpad HID mouse |
 | Exp12 | ❌ Failed | Tap-and-drag (drag lock) FSM for TPS43 — software FSM fights TPS43 hardware gesture engine, TPS43 native TAP_AND_HOLD should be used instead |
 | Exp13 | ✅ Complete | Pure-software tap FSM (libinput port) — TPS43 gesture engine disabled, single tap, drag, right-click via 2-finger tap, drag lock optional, no double-click |
+| Exp14 | ⚡ Active | Drop grace buffer for drag stability — DROP_GRACE_MS (20ms) filters transient contact-loss during drags, prevents false drops |

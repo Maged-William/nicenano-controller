@@ -9,6 +9,7 @@
 #define TAP_TIMEOUT_MS          CONFIG_TPS43_TAP_TIMEOUT_MS
 #define DRAG_TIMEOUT_MS        CONFIG_TPS43_DRAG_TIMEOUT_MS
 #define DRAGLOCK_TIMEOUT_MS    CONFIG_TPS43_DRAGLOCK_TIMEOUT_MS
+#define DROP_GRACE_MS          CONFIG_TPS43_DROP_GRACE_MS
 #define TAP_MOVE_THRESH        CONFIG_TPS43_TAP_MOVE_THRESH
 #define SAME_SPOT_THRESH       CONFIG_TPS43_SAME_SPOT_THRESH
 
@@ -68,11 +69,12 @@ void tps43_tapdrag_init(void)
 	button_down = false;
 	prev_state = 0xff;
 	prev_fg_count = 0xff;
+	lift_ms = 0;
 }
 
 bool tps43_tapdrag_update(bool finger_down, uint8_t finger_count,
                           uint16_t abs_x, uint16_t abs_y, uint64_t now_ms,
-                          bool *right_click, bool *double_click)
+                          bool *right_click)
 {
 	enum tap_event event;
 	bool was_down = (prev_fg_count > 0);
@@ -80,7 +82,6 @@ bool tps43_tapdrag_update(bool finger_down, uint8_t finger_count,
 	prev_fg_count = finger_down ? finger_count : 0;
 
 	if (right_click) *right_click = false;
-	if (double_click) *double_click = false;
 
 	/* Determine event from finger state changes */
 	if (finger_down && !was_down) {
@@ -208,6 +209,7 @@ bool tps43_tapdrag_update(bool finger_down, uint8_t finger_count,
 			    within_thresh(abs_y, tap_y, SAME_SPOT_THRESH)) {
 				/* Re-touch in same spot within drag timeout → start drag */
 				if (finger_count == 1) {
+					lift_ms = 0;
 					state = TAP_STATE_1FG_DRAGGING;
 					return true;
 				}
@@ -236,24 +238,35 @@ bool tps43_tapdrag_update(bool finger_down, uint8_t finger_count,
 
 	/* ════════════════════════════════════════════════════════
 	 * 1FG_DRAGGING — drag active, button held
+	 *
+	 * On RELEASE, instead of dropping immediately, enter a
+	 * grace window (DROP_GRACE_MS). The capacitive touchpad
+	 * may briefly lose contact during a fast swipe; if the
+	 * finger returns within the grace window the drag resumes.
 	 * ════════════════════════════════════════════════════════ */
 	case TAP_STATE_1FG_DRAGGING:
 		if (event == TAP_EVENT_RELEASE) {
-#ifdef CONFIG_TPS43_DRAGLOCK_ENABLE
 			lift_ms = now_ms;
-			state = TAP_STATE_1FG_DRAG_WAIT;
 			return true;
+		}
+		if (event == TAP_EVENT_TOUCH) {
+			if (lift_ms != 0) {
+				lift_ms = 0;
+			}
+			return true;
+		}
+		if (event == TAP_EVENT_MOTION) {
+			return true;
+		}
+		/* TIMEOUT — check if grace expired */
+		if (lift_ms != 0 && (now_ms - lift_ms) > DROP_GRACE_MS) {
+#ifdef CONFIG_TPS43_DRAGLOCK_ENABLE
+			state = TAP_STATE_1FG_DRAG_WAIT;
 #else
 			button_down = false;
 			state = TAP_STATE_IDLE;
 			return false;
 #endif
-		}
-		if (event == TAP_EVENT_TOUCH) {
-			return true;
-		}
-		if (event == TAP_EVENT_MOTION) {
-			return true;
 		}
 		return true;
 
