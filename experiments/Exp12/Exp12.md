@@ -185,4 +185,36 @@ All columns present, touchpad & FSM initialized, no crashes.
 
 ## Conclusion
 
-<!-- filled at experiment end -->
+**Verdict: FAILED — software tap-and-drag FSM is not viable with the TPS43.**
+
+The Azoteq TPS43 touch controller has an internal gesture engine that fires hardware gesture events (SINGLE_TAP, TAP_AND_HOLD, SWIPE_x, etc.) on every touch. When any gesture fires, the `FINGER_COUNT` register drops to 0 for 66–100ms, and `abs_x/y` may hold stale values for ~25ms before going to 0xFFFF. This makes a software-based tap-drag FSM fundamentally unreliable:
+
+1. **Gesture0 glitch**: Every touch (including re-touch during drag lock) triggers `gesture0` bit 0 or 1, which clears `FINGER_COUNT` to 0. The FSM sees a false "finger up" and cancels the drag.
+2. **Abs coordinate unreliability**: The `abs_x/y` registers don't track consistently during the gesture window — sometimes they hold valid positions, sometimes 0xFFFF, sometimes stale values.
+3. **Debounce/grace period workarounds insufficient**: Adding a grace period to ignore the glitch improves reliability but the underlying TPS43 behavior (hardware gesture firing on every touch) cannot be worked around cleanly — the hardware and software fight each other.
+
+**What the TPS43 provides natively (and what we should use instead):**
+
+| Register | Bit | Gesture | 
+|----------|-----|---------|
+| GestureEvents0 (0x0D) | 0x01 | SINGLE_TAP |
+| GestureEvents0 (0x0D) | 0x02 | **TAP_AND_HOLD** |
+| GestureEvents0 (0x0D) | 0x04–0x20 | SWIPE directions |
+| GestureEvents1 (0x0E) | 0x01 | TWO_FINGER_TAP |
+| GestureEvents1 (0x0E) | 0x02 | SCROLL |
+| GestureEvents1 (0x0E) | 0x04 | ZOOM |
+
+The TPS43 already has a native `TAP_AND_HOLD` gesture (bit 1 of GestureEvents0). It is configurable via `HoldTime` (0x06BD), `TapTime` (0x06B9), and `SFGestureEnable` (0x06B7). This should be the basis for any future tap-drag implementation.
+
+### Changes made during this experiment
+
+- `zephyr-app/src/drivers/tps43_tapdrag.c` — 6-state FSM with debounce, abs-validity grace period, confirm window
+- `zephyr-app/Kconfig` — Tunables for tap time, move threshold, same-spot threshold, redown window, confirm window, drag lock timeout, arm move threshold, glitch grace period
+- All code lives on branch `Exp12`
+
+### What was learned
+
+- TPS43 gesture engine is aggressive — it fires on every touch and cannot be easily bypassed
+- Software FSM for tap-drag on this hardware is fighting the built-in gesture detection
+- The TPS43's native `TAP_AND_HOLD` gesture is the correct mechanism for drag operations
+- Abs X/Y are unreliable as a lift discriminator; gesture register bits should be used instead
