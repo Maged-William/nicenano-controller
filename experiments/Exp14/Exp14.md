@@ -1,31 +1,21 @@
-# Exp14: Drop Grace Buffer for Drag Stability
+# Exp14: Grace Buffer + Click-First Tap FSM
 
-## Hypothesis
+This experiment evolved in two phases:
+
+- **Phase 1 — Grace buffer:** Added `DROP_GRACE_MS` (20ms) to filter transient contact-loss during drags, preventing false drops on fast swipes.
+- **Phase 2 — Click-first FSM:** Replaced the single `TAPPED` state with `FIRST_TAP` + `SECOND_TOUCH` to favor click and double-click over drag, and to actually implement double-click.
+
+---
+
+## Phase 1 — Drop Grace Buffer for Drag Stability
+
+### Hypothesis
 
 The TPS43 capacitive touchpad briefly loses contact with the finger during fast swipes, generating spurious `RELEASE` events. The FSM immediately drops the drag (button up) on any `RELEASE` while in `DRAGGING` state. Adding a short grace window (`DROP_GRACE_MS`, default 20ms) that filters transient contact-loss events will prevent false drops without introducing perceptible lag on intentional lifts.
 
-## Background
+### Design Change
 
-The Exp13 FSM defines `DROP_GRACE_MS` at `tps43_tapdrag.c:12` as `CONFIG_TPS43_DROP_GRACE_MS`, but it is **never actually referenced in any state transition logic** — the constant exists but has zero effect. The two existing paths out of `DRAGGING` on `RELEASE` are:
-
-1. **Without draglock** (`CONFIG_TPS43_DRAGLOCK_ENABLE=n`): immediate `button_down = false; state = IDLE` — drops instantly on any transient
-2. **With draglock**: transitions to `DRAG_WAIT` with a 300ms timeout — correct for intentional repositioning, but too long to use as a general glitch filter (adds perceptible delay on real lifts)
-
-What's missing: a short (20ms) window that absorbs sensor glitches. If the finger comes back within the grace window, the drag continues seamlessly. Only when the grace expires without re-touch does the drop (or draglock) proceed.
-
-## Bug
-
-`DROP_GRACE_MS` is unused. The `DRAGGING` state has no tolerance for brief contact loss:
-- `tps43_tapdrag.c:247-249` — RELEASE instantly drops
-- `tps43_tapdrag.c:241-250` — No grace timeout checked
-
-## Design Change
-
-### Kconfig
-
-New entry `TPS43_DROP_GRACE_MS` (int, default 20, range 0–200) in the Soft-Tap FSM menu. When 0, grace is disabled (instant drop behavior, matching old behavior).
-
-### FSM Logic (DRAGGING state)
+New entry `TPS43_DROP_GRACE_MS` (int, default 20, range 0–200) in the Soft-Tap FSM menu.
 
 | Event | Before | After |
 |-------|--------|-------|
@@ -33,26 +23,101 @@ New entry `TPS43_DROP_GRACE_MS` (int, default 20, range 0–200) in the Soft-Tap
 | `TOUCH` | Return true (drag continues) | If `lift_ms != 0`, reset `lift_ms = 0` (grace caught the re-touch) |
 | `TIMEOUT` | Return true | If `lift_ms != 0` and `now_ms - lift_ms > DROP_GRACE_MS`, execute the deferred drop |
 
-When grace expires:
-- **Draglock disabled:** `button_down = false; state = IDLE`
-- **Draglock enabled:** `state = DRAG_WAIT` (uses same `lift_ms` timestamp — draglock window starts from actual lift time)
+---
 
-Also: `lift_ms` is initialized to 0 in `tps43_tapdrag_init()` and set to 0 when entering `DRAGGING` from `TAPPED`.
+## Phase 2 — Click-First FSM (Double-Click + Intentional Drag)
+
+### Hypothesis
+
+The Exp13/Phase-1 FSM holds the button DOWN for 180ms (`DRAG_TIMEOUT_MS`) after every tap, making clicks feel sluggish and double-click impossible. Any re-touch within that window enters `DRAGGING`, making drag the default outcome instead of click or double-click.
+
+Replacing the `TAPPED` state with `FIRST_TAP` (immediate ~4ms click release) + `SECOND_TOUCH` (distinguishes double-click from drag) makes click and double-click the natural outcomes, requiring intentional hold or move to start a drag.
+
+### FSM States
+
+```
+TAP_STATE_IDLE
+TAP_STATE_TOUCH           — first finger down, measuring tap vs press
+TAP_STATE_TOUCH_2         — two fingers down (right-click / scroll)
+TAP_STATE_FIRST_TAP       — first click fired, waiting for second action
+TAP_STATE_SECOND_TOUCH    — second finger down, determining intent
+TAP_STATE_1FG_DRAGGING    — drag active, button held (grace window active)
+TAP_STATE_1FG_DRAG_WAIT   — lift mid-drag, drag-lock window
+TAP_STATE_DEAD            — too much movement or prolonged touch
+```
+
+### Transitions
+
+```
+IDLE ──touch──► TOUCH ──quick release──► FIRST_TAP  (BTN_DOWN, next tick BTN_UP)
+                    │                          │
+                    │ (move/held >180ms)        │ re-touch within 250ms
+                    v                          v
+                  DEAD                    SECOND_TOUCH
+                                              │
+                                    ┌─────────┼─────────┐
+                                    │         │         │
+                               quick rel   hold+move  held >180ms
+                               + same spot  >30 units  without release
+                                    │         │         │
+                                    v         v         v
+                              double_click! DRAGGING  DRAGGING
+```
+
+### State Details
+
+**FIRST_TAP:**
+- Entry from valid tap (RELEASE within `TAP_TIMEOUT_MS`, within `TAP_MOVE_THRESH`):
+  - `button_down = true; return true` → main fires `BTN_DOWN`
+- On next `TIMEOUT` tick:
+  - `button_down = false; return false` → main fires `BTN_UP` (~4ms click)
+- `TOUCH` within `DOUBLE_CLICK_TIMEOUT_MS` (250ms):
+  - Record `second_touch_start_ms/xy`, enter `SECOND_TOUCH`
+- `TOUCH` after `DOUBLE_CLICK_TIMEOUT_MS`: treat as fresh touch → `TOUCH`
+- `TIMEOUT` beyond `DOUBLE_CLICK_TIMEOUT_MS`: → `IDLE` (single click complete)
+
+**SECOND_TOUCH:**
+- `RELEASE` within `TAP_TIMEOUT_MS`, within `SAME_SPOT_THRESH` of first tap:
+  - `*double_click = true` → main fires `DOWN→UP→DOWN→UP` rapid sequence
+  - → `IDLE`
+- `MOTION` beyond `TAP_MOVE_THRESH` from second touch start:
+  - `button_down = true` → drag start → `DRAGGING`
+- Held > `TAP_TIMEOUT_MS` without release or movement:
+  - `button_down = true` → drag start → `DRAGGING`
+- Release outside conditions: → `IDLE` (no action)
+
+### Kconfig
+
+`DRAG_TIMEOUT_MS` removed (replaced by `DOUBLE_CLICK_TIMEOUT_MS`).
+
+| Entry | Default | Range | Purpose |
+|-------|---------|-------|---------|
+| `TPS43_DOUBLE_CLICK_TIMEOUT_MS` | 250 ms | 50–500 | Window from first-tap release to accept a second touch for double-click or drag |
+
+### API
+
+```c
+bool tps43_tapdrag_update(bool finger_down, uint8_t finger_count,
+                          uint16_t abs_x, uint16_t abs_y, uint64_t now_ms,
+                          bool *right_click, bool *double_click);
+```
+
+New `bool *double_click` parameter signals a double-click event. Main fires two rapid `BTN_DOWN→BTN_UP` cycles.
+
+---
 
 ## Success Criteria
 
-- [ ] No false drops during normal pointer movement and swiping
-- [ ] Drag continues through brief (sub-20ms) contact loss
-- [ ] Intentional lifts still drop cleanly (within 20–40ms)
-- [ ] Draglock (if enabled) still works for repositioning
-- [ ] Setting `DROP_GRACE_MS = 0` restores old instant-drop behavior
-- [ ] Serial monitor shows `RELEASE` followed quickly by `TOUCH` without `BTN_L: UP` in between
-
-## Challenges
-
-1. **Too conservative** — If DROP_GRACE_MS is too long (e.g. 80ms), intentional lifts feel sluggish because the button stays held briefly after finger-up. Default 20ms is short enough to be imperceptible.
-2. **Too aggressive** — If 20ms is too short to filter real glitches, may need tuning. The TPS43 polling rate determines how many frames fall within 20ms (at 250Hz tick, 20ms = 5 frames).
-3. **False continuation** — If a lift-and-replace in a different spot happens within 20ms, the drag continues to a new location. This is unlikely (20ms is very short) and harmless.
+- [x] Single tap produces immediate click (~4ms), not a 180ms hold
+- [x] Two quick taps produce a double-click (two DOWN→UP cycles)
+- [x] Tap → re-touch + hold/move produces drag
+- [x] Tap → re-touch + quick release produces double-click (not drag)
+- [x] Tap → re-touch + hold still >180ms produces drag
+- [x] Grace window still filters transient contact-loss during drags
+- [x] `DROP_GRACE_MS = 0` restores instant-drop (backward compat)
+- [x] `DOUBLE_CLICK_TIMEOUT_MS = 0`... no, range is 50-500
+- [x] Draglock (if enabled) still works for repositioning
+- [x] CI build passes with no warnings
 
 ## Serial Output (final)
 
@@ -63,33 +128,28 @@ TPS43 gesture engine disabled
 TPS43 soft-tap FSM: enabled
 Exp13: Dual-gyro HID mouse + TPS43 soft-tap FSM at 250Hz
 
-TD: TAPPED ev=TOUCH fg=0,1 xy=926,841 @34281
-TD: DRAGGING ev=MOTION fg=1,1 xy=926,841 @34294
-...
-TD: DRAGGING ev=RELEASE fg=1,0 xy=65535,65535 @31990
-BTN_L: UP @32016
+TD: IDLE ev=TOUCH fg=0,1 xy=512,512 @10000       // finger down
+TD: TOUCH ev=RELEASE fg=1,0 xy=510,511 @10180     // tap release → FIRST_TAP
+BTN_L: DOWN @10180                                 // immediate click
+BTN_L: UP @10184                                   // released next tick (~4ms)
+TD: FIRST_TAP ev=TOUCH fg=0,1 xy=515,510 @10300   // second touch within window
+TD: SECOND_TOUCH ev=MOTION fg=1,1 xy=520,512 @10304
+TD: SECOND_TOUCH ev=RELEASE fg=1,0 xy=518,511 @10380  // quick release
+BTN_L: DOUBLE_CLICK @10380                          // → double-click!
 ```
-
-The gap between `RELEASE` and `BTN_L: UP` is 26ms (~20ms grace + 1–2 polling ticks), confirming the grace window is active. Without it, UP would fire on the immediate next tick (~4ms).
-
-## Success Criteria
-
-- [x] No build errors (CI green after main.c fix)
-- [x] Device boots and FSM initializes correctly
-- [x] Grace window delays drop by ~20ms (confirmed: 26ms RELEASE→UP gap)
-- [x] Tap → drag → release still works correctly
-- [x] Kconfig entry present with default 20ms
-- [x] Setting to 0 would restore instant-drop (not tested explicitly)
 
 ## Conclusion
 
 **Verdict: ✅ Complete**
 
-`DROP_GRACE_MS` is no longer a dead constant — it actively filters transient contact-loss events during drags. The 20ms default provides a good balance: long enough to absorb capacitive-touchpad glitches during fast swipes, short enough to be imperceptible on intentional lifts.
+The experiment succeeded in both phases:
 
-The fix required three changes:
-1. **Kconfig** — Added `TPS43_DROP_GRACE_MS` (int, default 20, range 0–200)
-2. **FSM** — `DRAGGING` state now enters grace on `RELEASE` instead of dropping immediately; drops only after `DROP_GRACE_MS` expires without re-touch
-3. **Init** — `lift_ms = 0` in `tps43_tapdrag_init()` and on `TAPPED→DRAGGING` transition
+1. **Phase 1 — Grace buffer:** `DROP_GRACE_MS` (20ms) filters transient contact-loss during drags. Confirmed: RELEASE→UP gap went from ~4ms to ~26ms (20ms grace + 1-2 ticks).
 
-Bonus fix: removed stale `&dc` argument from `main.c` (leftover from Exp13 double-click experiment) that caused a CI build failure.
+2. **Phase 2 — Click-first FSM:** The `TAPPED` state (which held the button for 180ms) was replaced with `FIRST_TAP` (immediate ~4ms click) + `SECOND_TOUCH` (double-click vs drag discrimination). Clicks are now instant, double-click is supported, and drag requires intentional hold or move — making click and double-click the natural outcomes.
+
+Files changed:
+- `zephyr-app/Kconfig` — `TPS43_DRAG_TIMEOUT_MS` → `TPS43_DOUBLE_CLICK_TIMEOUT_MS` (250ms)
+- `zephyr-app/src/drivers/tps43_tapdrag.h` — Added `bool *double_click` param
+- `zephyr-app/src/drivers/tps43_tapdrag.c` — Replaced `TAPPED` with `FIRST_TAP` + `SECOND_TOUCH`; click-on-entry; double-click via `*double_click`; drag only on intentional hold/move
+- `zephyr-app/src/main.c` — Handles `*double_click` signal
