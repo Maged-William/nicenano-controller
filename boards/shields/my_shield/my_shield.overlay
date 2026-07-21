@@ -51,7 +51,7 @@
         label = "ADS1015";
         channel-x = <0>;
         channel-y = <1>;
-        update-interval-ms = <20>;
+        update-interval-ms = <3>;
         status = "okay";
     };
 };

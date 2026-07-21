@@ -15,7 +15,7 @@ LOG_MODULE_REGISTER(ads1015_input, CONFIG_ZMK_ADS1015_INPUT_LOG_LEVEL);
 #define ADS1015_MUX(ch)      ((0b100 | ((ch) & 3)) << 12)
 #define ADS1015_PGA_4_096V   (0b001 << 9)
 #define ADS1015_MODE_SINGLE  BIT(8)
-#define ADS1015_DR_128SPS    (0 << 5)
+#define ADS1015_DR_2400SPS   (5 << 5)
 #define ADS1015_COMP_DISABLE 0x03
 
 struct ads1015_input_config {
@@ -57,7 +57,7 @@ static int16_t ads1015_read_channel(const struct device *i2c, uint16_t addr,
 {
     uint16_t cfg = ADS1015_OS_SINGLE | ADS1015_MUX(ch)
                  | ADS1015_PGA_4_096V | ADS1015_MODE_SINGLE
-                 | ADS1015_DR_128SPS | ADS1015_COMP_DISABLE;
+                 | ADS1015_DR_2400SPS | ADS1015_COMP_DISABLE;
 
     if (ads1015_write_reg(i2c, addr, ADS1015_CONFIG_REG, cfg) != 0) {
         return 0;
@@ -102,7 +102,7 @@ static void ads1015_poll_handler(struct k_work *work)
     int16_t dx = x - data->center_x;
     int16_t dy = y - data->center_y;
 
-    int16_t deadzone = 2000;
+    int16_t deadzone = 500;
     if (dx > -deadzone && dx < deadzone) dx = 0;
     if (dy > -deadzone && dy < deadzone) dy = 0;
 
@@ -152,7 +152,7 @@ static int ads1015_input_init(const struct device *dev)
         .i2c_addr = DT_INST_REG_ADDR(n), \
         .ch_x = DT_INST_PROP_OR(n, channel_x, 0), \
         .ch_y = DT_INST_PROP_OR(n, channel_y, 1), \
-        .interval_ms = DT_INST_PROP_OR(n, update_interval_ms, 20), \
+        .interval_ms = DT_INST_PROP_OR(n, update_interval_ms, 3), \
     }; \
     static struct ads1015_input_data ads1015_input_data_##n; \
     DEVICE_DT_INST_DEFINE(n, ads1015_input_init, NULL, \

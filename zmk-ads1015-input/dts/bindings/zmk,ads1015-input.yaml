@@ -18,7 +18,7 @@ properties:
     type: int
     default: 1
     description: ADC channel for Y axis (0-3)
-  update-interval-ms:
+    update-interval-ms:
     type: int
-    default: 20
+    default: 3
     description: Polling interval in milliseconds
