@@ -67,7 +67,38 @@ Diode direction: **COL2ROW**
 - Keymap files must `#include <behaviors.dtsi>` and `<dt-bindings/zmk/keys.h>` for keycode resolution
 - Board variant `nice_nano//zmk` is correct for nice!nano V2 (maps from `nice_nano_v2` → `nice_nano@2.0.0//zmk` → `nice_nano//zmk`)
 - The reusable workflow `zmkfirmware/zmk/.github/workflows/build-user-config.yml@main` auto-detects modules with `zephyr/module.yml`
+- USB logging requires the `zmk-usb-logging` snippet (via `snippet:` in `build.yaml`) or `CONFIG_ZMK_USB_LOGGING=y` in `.conf`; the CDC ACM port appears on COM18 (Windows) with PID matching the original ZMK USB PID
+- ZMK tracks battery voltage via nRF52840 ADC; logged automatically when USB logging is enabled
 
 ## Conclusion
 
-**Verdict: ✅ Complete** — CI builds successfully, UF2 artifact produced. Hardware testing pending matrix wiring.
+**Verdict: ✅ Complete** — CI builds successfully, UF2 artifact produced, hardware verified via USB logging.
+
+### USB Logging Verification (via `zmk-usb-logging` snippet)
+
+Using the `zmk-usb-logging` snippet in `build.yaml`:
+```
+include:
+  - board: nice_nano//zmk
+    shield: my_shield
+    snippet: zmk-usb-logging
+```
+
+Serial output captured on COM18 (CDC ACM) at 115200 baud:
+
+**Boot log** showed matrix initialization with correct pins:
+- Row inputs: P0.09, P0.10, P1.11, P1.13, P1.15
+- Column outputs: P0.24, P1.00, P0.11, P1.04, P1.06
+
+**Key press verified** — pressing a key produced:
+```
+kscan_matrix_read: Row: 2, col: 2, position: 12, pressed: true
+keymap_apply_position_state: layer_id: 0 position: 12, binding name: key_press
+on_keymap_binding_pressed: position 12 keycode 0x70008
+hid_listener_keycode_pressed: usage_page 0x07 keycode 0x08
+```
+Keycode 0x70008 = HID usage page 7, code 8 = keyboard **E** (our position 12 = row 2, col 2 = `&kp E`).
+
+**Battery monitor** working: `ADC raw 2965 ~ 4340 mV => 100%`
+
+The shield matrix, keymap, HID endpoint, and USB logging all function correctly.
