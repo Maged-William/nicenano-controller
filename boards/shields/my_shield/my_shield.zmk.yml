@@ -1,0 +1,8 @@
+file_format: "1"
+id: my_shield
+name: my_shield
+type: shield
+url: https://github.com/Maged-William/nicenano-controller
+requires: [pro_micro]
+features:
+  - keys
