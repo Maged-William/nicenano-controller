@@ -1,3 +1,4 @@
 include:
   - board: nice_nano//zmk
     shield: my_shield
+    snippet: zmk-usb-logging
