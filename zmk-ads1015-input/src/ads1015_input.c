@@ -89,9 +89,8 @@ static void ads1015_poll_handler(struct k_work *work)
     int16_t x = ads1015_read_channel(cfg->i2c_bus, cfg->i2c_addr, cfg->ch_x);
     int16_t y = ads1015_read_channel(cfg->i2c_bus, cfg->i2c_addr, cfg->ch_y);
 
-    input_report_abs(data->dev, INPUT_ABS_X, x, false);
-    input_report_abs(data->dev, INPUT_ABS_Y, y, false);
-    input_sync(data->dev);
+    input_report_abs(data->dev, INPUT_ABS_X, x, false, K_NO_WAIT);
+    input_report_abs(data->dev, INPUT_ABS_Y, y, true, K_NO_WAIT);
 
     LOG_DBG("ADS1015 X=%d Y=%d", x, y);
 
