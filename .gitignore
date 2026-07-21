@@ -2,6 +2,7 @@
 experiments/*/firmware/.pio/
 experiments/*/firmware/firmware.uf2
 firmware.uf2
+zephyr.uf2
 
 # Zephyr workspace artifacts (created by west update)
 zephyr-app/zephyr/
