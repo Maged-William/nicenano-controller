@@ -123,6 +123,11 @@ int main(void)
 			k_sleep(K_MSEC(20));
 		}
 		printk(sum_lsb == 0 ? "ADS1015 (12-bit)\n" : "ADS1115 (16-bit)\n");
+
+		ads1015_set_data_rate(ADS1015_RATE_128);
+		ads1015_calibrate(2, 32);
+		ads1015_calibrate(3, 32);
+		printk("Hall sensors calibrated (ch2, ch3) at 128 SPS\n");
 	}
 
 #if CONFIG_TPS43_ENABLE
@@ -167,7 +172,7 @@ int main(void)
 #endif
 
 	printk("Exp15: Dual-gyro HID mouse + TPS43 soft-tap FSM + edge scroll at 250Hz\n");
-	printk("tick\tFX\tFY\tFZ\tCH0\tCH1\tCH2\tCH3\tTP_X\tTP_Y\tTP_F\tABS_X\tABS_Y\n");
+	printk("tick\tFX\tFY\tFZ\tCH0\tCH1\tCH2_cal\tCH3_cal\tTP_X\tTP_Y\tTP_F\tABS_X\tABS_Y\n");
 
 	int64_t next_tick;
 	int tick_count = 0;
@@ -375,8 +380,8 @@ int main(void)
 		if (tick_count % ADC_DECIMATION == 0) {
 			int16_t ch0 = ads1015_read_channel(0);
 			int16_t ch1 = ads1015_read_channel(1);
-			int16_t ch2 = ads1015_read_channel(2);
-			int16_t ch3 = ads1015_read_channel(3);
+			int16_t ch2 = ads1015_read_calibrated(2);
+			int16_t ch3 = ads1015_read_calibrated(3);
 			printk("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
 			       tick_count, (int)fx, (int)fy, (int)fz,
 			       ch0, ch1, ch2, ch3,
