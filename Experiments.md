@@ -18,3 +18,4 @@
 | Exp14 | ✅ Complete | Grace buffer + click-first FSM — DROP_GRACE_MS (20ms) filters transient contact-loss during drags; click-on-entry, double-click, and intentional drag-only FSM (FIRST_TAP + SECOND_TOUCH) |
 | Exp15 | ✅ Complete | 1-finger edge scroll on TPS43 — 4 configurable edges (L/R/T/B) with per-edge axis, speed, invert; no FSM changes |
 | Exp16 | ✅ Complete | 49E linear Hall effect sensors on ADS1015 — decoupling analysis, 128 SPS data rate, zero-offset calibration, replacing one joystick |
+| Exp17 | 🔄 In progress | Initial ZMK migration — basic 5×5 unibody shield (my_shield), ZMK build replacing manual Zephyr RTOS CI, `main` branch |
