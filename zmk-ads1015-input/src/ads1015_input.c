@@ -29,6 +29,9 @@ struct ads1015_input_config {
 struct ads1015_input_data {
     struct k_work_delayable work;
     const struct device *dev;
+    int16_t center_x;
+    int16_t center_y;
+    bool calibrated;
 };
 
 static int ads1015_write_reg(const struct device *i2c, uint16_t addr,
@@ -88,6 +91,14 @@ static void ads1015_poll_handler(struct k_work *work)
 
     int16_t x = ads1015_read_channel(cfg->i2c_bus, cfg->i2c_addr, cfg->ch_x);
     int16_t y = ads1015_read_channel(cfg->i2c_bus, cfg->i2c_addr, cfg->ch_y);
+
+    if (!data->calibrated) {
+        data->center_x = x;
+        data->center_y = y;
+        data->calibrated = true;
+        LOG_INF("ADS1015 center: X=%d Y=%d", data->center_x, data->center_y);
+        input_report_key(data->dev, INPUT_BTN_TOUCH, 1, true, K_NO_WAIT);
+    }
 
     input_report_abs(data->dev, INPUT_ABS_X, x, false, K_NO_WAIT);
     input_report_abs(data->dev, INPUT_ABS_Y, y, true, K_NO_WAIT);
