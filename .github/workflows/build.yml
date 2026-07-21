@@ -1,41 +1,6 @@
-name: Build ZMK Firmware (my_shield)
-
-on:
-  push:
-    branches: ["**"]
+name: Build ZMK firmware
+on: [push, pull_request, workflow_dispatch]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    container: zmkfirmware/zmk-build-arm:stable
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Cache west modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            config/.west/
-            config/modules/
-            config/zephyr/
-            config/bootloader/
-            config/tools/
-          key: ${{ runner.os }}-zmk-${{ hashFiles('config/west.yml') }}
-
-      - name: Initialize & update workspace
-        working-directory: config
-        run: |
-          west init -l .
-          west update
-          west zephyr-export
-
-      - name: Build my_shield (nice_nano)
-        working-directory: config
-        run: |
-          west build -s zmk/app -b nice_nano -- -DSHIELD=my_shield -DZMK_CONFIG="$PWD"
-
-      - name: Upload UF2 artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: firmware-uf2
-          path: config/build/zephyr/zephyr.uf2
+    uses: zmkfirmware/zmk/.github/workflows/build-user-config.yml@main
