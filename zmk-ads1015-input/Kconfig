@@ -1,0 +1,20 @@
+menuconfig ZMK_ADS1015_INPUT
+	bool "ADS1015 I2C ADC input driver"
+	default y
+	depends on I2C
+	help
+	  Enable the ADS1015 I2C ADC input driver. Reads configured
+	  analog channels and emits INPUT_ABS events for use with
+	  ZMK's pointing subsystem.
+
+if ZMK_ADS1015_INPUT
+
+config ZMK_ADS1015_INPUT_LOG_LEVEL
+	int "Log level"
+	default 2
+	range 0 4
+	help
+	  Log level for ADS1015 input driver.
+	  0=OFF, 1=ERR, 2=WRN, 3=INF, 4=DBG
+
+endif

@@ -39,3 +39,27 @@
             ;
     };
 };
+
+&i2c0 {
+    status = "okay";
+};
+
+&i2c0 {
+    ads1015: ads1015-input@48 {
+        compatible = "zmk,ads1015-input";
+        reg = <0x48>;
+        label = "ADS1015";
+        channel-x = <0>;
+        channel-y = <1>;
+        update-interval-ms = <20>;
+        status = "okay";
+    };
+};
+
+/ {
+    pointing {
+        compatible = "zmk,input-listener";
+        status = "okay";
+        device = <&ads1015>;
+    };
+};

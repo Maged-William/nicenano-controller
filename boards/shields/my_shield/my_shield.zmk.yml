@@ -6,3 +6,4 @@ url: https://github.com/Maged-William/nicenano-controller
 requires: [pro_micro]
 features:
   - keys
+  - pointing

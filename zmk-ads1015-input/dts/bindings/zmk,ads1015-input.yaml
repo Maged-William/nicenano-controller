@@ -1,0 +1,24 @@
+description: ADS1015 I2C ADC input device (joystick)
+
+compatible: "zmk,ads1015-input"
+
+properties:
+  label:
+    type: string
+    required: true
+  reg:
+    type: array
+    required: true
+    description: I2C slave address
+  channel-x:
+    type: int
+    default: 0
+    description: ADC channel for X axis (0-3)
+  channel-y:
+    type: int
+    default: 1
+    description: ADC channel for Y axis (0-3)
+  update-interval-ms:
+    type: int
+    default: 20
+    description: Polling interval in milliseconds
