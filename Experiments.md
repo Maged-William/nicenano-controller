@@ -16,4 +16,4 @@
 | Exp12 | ❌ Failed | Tap-and-drag (drag lock) FSM for TPS43 — software FSM fights TPS43 hardware gesture engine, TPS43 native TAP_AND_HOLD should be used instead |
 | Exp13 | ✅ Complete | Pure-software tap FSM (libinput port) — TPS43 gesture engine disabled, single tap, drag, right-click via 2-finger tap, drag lock optional, no double-click |
 | Exp14 | ✅ Complete | Grace buffer + click-first FSM — DROP_GRACE_MS (20ms) filters transient contact-loss during drags; click-on-entry, double-click, and intentional drag-only FSM (FIRST_TAP + SECOND_TOUCH) |
-| Exp15 | 🔄 In Progress | 1-finger edge scroll on TPS43 — right edge → vertical scroll, bottom edge → horizontal scroll, no FSM changes |
+| Exp15 | ✅ Complete | 1-finger edge scroll on TPS43 — 4 configurable edges (L/R/T/B) with per-edge axis, speed, invert; no FSM changes |

@@ -1,39 +1,30 @@
 # Exp15: 1-Finger Edge Scroll on TPS43
 
-**Status: In Progress**
+**Status: ✅ Complete**
 
 ---
 
-### Motivation
-
-Current scroll requires 2 fingers. Adding 1-finger edge scroll (right edge = vertical, bottom edge = horizontal) for convenience, matching macOS/libinput behavior.
-
 ### Hypothesis
 
-Using the TPS43's absolute finger position to detect edge zones and redirecting 1-finger relative motion to wheel accumulators will provide usable edge scrolling without changing the tap/drag FSM.
+Using the TPS43's absolute finger position to detect edge zones and redirecting 1-finger relative motion to wheel accumulators provides usable edge scrolling without changing the tap/drag FSM. The FSM is left unchanged — only motion routing changes.
 
-### Design
+### Design Evolution
 
-**No FSM changes.** Edge scroll lives entirely in `main.c`, before the 1-finger pointer branch:
+| Iteration | Change | Result |
+|-----------|--------|--------|
+| Initial | Per-tick edge zone check, 2-finger scroll combined | Scroll speed too fast, abs_x/y bug broke taps |
+| Fix 1 | 10x speed reduction, always read abs registers | Taps/drags fixed, scroll smoother |
+| Fix 2 | Touch-start locks scroll mode for whole gesture | No mid-gesture mode switching |
+| Final | 4 configurable edges (L/R/T/B), each with axis/speed/invert | Full flexibility, both axes scroll in mode |
 
-```
-One finger touching:
-  ├─ Right edge (abs_x > threshold)  → tdy → mouse_wheel  (vertical scroll)
-  ├─ Bottom edge (abs_y > threshold) → tdx → mouse_wheel_h (horizontal scroll)
-  └─ Else                             → pointer motion (unchanged)
+### Behavior (final)
 
-Two+ fingers: unchanged 2-finger scroll
-Taps/clicks/drags: unchanged (FSM operates independently of scroll routing)
-```
-
-Edge zones are defined as a configurable percentage from the right/bottom edge, computed against configurable absolute max X/Y values.
-
-### Changes
-
-| File | Change |
-|------|--------|
-| `zephyr-app/Kconfig` | New `TPS43_EDGESCROLL_ENABLE` + edge zone width config |
-| `zephyr-app/src/main.c` | Edge zone detection before 1-finger pointer branch |
+- **Touch starts** in any edge zone (pct > 0) → scroll mode for the whole gesture
+- **In scroll mode**: tdy → vertical wheel, tdx → horizontal wheel
+- Speed from whichever edge zone finger is currently in; defaults to 0.1x in center
+- 1-finger center → pointer motion (unchanged)
+- 2-finger scroll **disabled** when edge scroll enabled
+- Taps/clicks/drags work normally (FSM unchanged)
 
 ### Kconfig
 
@@ -71,11 +62,27 @@ When `TPS43_EDGESCROLL_ENABLE=y`:
 
 ### Success Criteria
 
-- [ ] 1-finger on right edge → vertical scroll (up/down)
-- [ ] 1-finger on bottom edge → horizontal scroll (left/right)
-- [ ] 1-finger on left/top edges → configurable scroll
-- [ ] Scroll speed configurable per edge
-- [ ] Scroll axis configurable per edge (Y or X)
-- [ ] Scroll direction invertible per edge
-- [ ] Center → pointer, taps, drags all work
-- [ ] CI build passes with no warnings
+- [x] 1-finger on right edge → vertical scroll (up/down)
+- [x] 1-finger on bottom edge → horizontal scroll (left/right)
+- [x] 1-finger on left/top edges → configurable scroll (axis, speed, invert)
+- [x] Scroll speed configurable per edge (speed num/denom per edge)
+- [x] Scroll axis configurable per edge (Y=0 or X=1)
+- [x] Scroll direction invertible per edge (bool per edge)
+- [x] Center → pointer, taps, drags all work (FSM untouched)
+- [x] CI build passes with no warnings
+
+### Conclusion
+
+**Verdict: ✅ Complete**
+
+The experiment succeeded. The four-edge scroll system provides configurable 1-finger edge scrolling on the TPS43 touchpad:
+
+- **Dynamic per-tick**: scroll axes and speed follow the finger's current position across edges
+- **Locked on touch-start**: scroll mode activates only when a touch begins in an edge zone, preventing accidental scroll mid-gesture
+- **Full Kconfig flexibility**: each edge has independent zone width (%), axis (Y or X), speed (num/denom), and invert
+- **No FSM changes**: tap, drag, double-click, right-click all work as before
+
+Files changed:
+- `zephyr-app/Kconfig` — Added `TPS43_EDGESCROLL_ENABLE`, 4-edge config (L/R/T/B) with ABS_MAX_X/Y, axis, speed, invert
+- `zephyr-app/src/main.c` — Edge scroll mode detection, dynamic per-tick edge routing, debug ABS_X/ABS_Y columns
+- `experiments/Exp15/Exp15.md` — Experiment document
