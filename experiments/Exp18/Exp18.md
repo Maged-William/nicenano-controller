@@ -59,25 +59,40 @@ Channels 2/3 (hall sensors): **skipped** for this experiment.
 | 3 | No mouse movement — `INPUT_ABS` events ignored without `BTN_TOUCH` | Added `BTN_TOUCH=1` on first poll |
 | 4 | Still no movement — ZMK listener updates anchor on every ABS event → delta=0 | Switched to `INPUT_REL_X`/`INPUT_REL_Y` with center-displacement math |
 | 5 | Mouse speed too fast (~134 px/frame) | Changed divisor from 100→1000, deadzone from 200→2000 |
+| 6 | Choppy mouse movement at 26 Hz poll rate | Increased ADS1015 to 2400 SPS, poll interval 20→3ms (~140 Hz effective) |
+| 7 | DTS binding YAML syntax error — `update-interval-ms` nested under channel-y | Fixed indentation, included `i2c-device.yaml` for reg property |
+| 8 | ZMK Kconfig undefined symbol `SETTINGS_RESET` | Removed, lowered ADC log to WRN temporarily for boot capture |
+| 9 | BLE not discoverable on battery — Leonardo parasitic voltage held nRF in bootloader | Unplug Leonardo + power-cycle nice!nano; `CONFIG_ZMK_BLE=y` verified working |
 
 ## Known-Good Commit
 
 ```bash
 git checkout exp18-good
-# Tag: exp18-good → 6cf8580
+# Tag: exp18-good → 564ca7b
 ```
 
 ## Conclusion
 
-**Verdict: ✅ Complete** — ADS1015 I2C ADC successfully ported to ZMK as a custom input driver. Joystick X/Y produces mouse pointer movement at a usable speed with deadzone filtering.
+**Verdict: ✅ Complete** — ADS1015 I2C ADC successfully ported to ZMK as a custom input driver. Joystick X/Y produces smooth mouse pointer movement with deadzone filtering, and BLE advertising works when the nice!nano is properly power-cycled.
 
 Key implementation decisions:
 - Driver computes displacement from center → `INPUT_REL_X`/`INPUT_REL_Y` (not ABS)
 - Center calibrated on first poll cycle
-- Hardcoded deadzone (2000 ADC units ≈ 125 LSB) and sensitivity (div 1000)
-- Polling interval: 20ms (effective ~38ms with I2C read delays ≈ 26 Hz)
+- ADS1015 at 2400 SPS, polled every 3ms (~140 Hz effective update rate)
+- Hardcoded deadzone (500 ADC units) and sensitivity (div 1000 ≈ 10% speed)
+- `CONFIG_ZMK_BLE=y` for Bluetooth advertising
+
+### BLE Discovery Note
+Device was invisible on battery because the Arduino Leonardo kept the nice!nano RST line low via parasitic voltage, holding it in bootloader mode. Fix: disconnect Leonardo USB or use a diode-isolated reset circuit. After power-cycling the nice!nano alone, the device appears as `my_shield` in Bluetooth scanning.
+
+### Smoothness Tuning
+- Initial rate: 128 SPS, 20ms interval → ~26 Hz → **choppy**
+- Final rate: 2400 SPS, 3ms interval → ~140 Hz → **smooth**
+- Deadzone: 500 ADC units (~3% of full scale) filters center jitter
+- Mouse speed: ~12 px/sec at full deflection (comfortable for pointer use)
 
 Next steps for refinement:
-- Make sensitivity, deadzone Kconfig-configurable
-- Use state-machine I2C reads instead of busy-wait
+- Make sensitivity, deadzone Kconfig-configurable via DT or Kconfig
+- Use state-machine I2C reads instead of busy-wait to unblock workqueue
 - Add hall sensor channels (ch2, ch3) as additional input axes
+- Add diode on Leonardo RST line to prevent parasitic backfeed
