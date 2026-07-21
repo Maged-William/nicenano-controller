@@ -2,6 +2,8 @@ description: ADS1015 I2C ADC input device (joystick)
 
 compatible: "zmk,ads1015-input"
 
+include: [i2c-device.yaml]
+
 properties:
   label:
     type: string
