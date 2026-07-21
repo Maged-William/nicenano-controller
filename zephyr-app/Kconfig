@@ -481,7 +481,7 @@ config TPS43_EDGE_BOTTOM_PCT
 
 config TPS43_EDGE_BOTTOM_AXIS
 	int "Scroll axis (0=Y/vertical, 1=X/horizontal)"
-	default 0
+	default 1
 	range 0 1
 
 config TPS43_EDGE_BOTTOM_SPEED_NUM

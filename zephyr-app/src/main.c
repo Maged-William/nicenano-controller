@@ -236,28 +236,30 @@ int main(void)
 				}
 
 				if (tps43_edge_scroll_mode) {
-					float sv = 0, sh = 0;
+					float sv = (float)tdy;
+					float sh = (float)tdx;
 
-#define EDGE_CONTRIB(pct, th, axis, num, denom, inv, dx, dy) \
+#define EDGE_SPEED(pct, th, num, denom) \
 	if (pct > 0 && th) { \
-		float _sp = (float)num / (float)denom; \
-		if (axis == 0) { \
-			float _v = (float)dy * _sp; \
-			if (inv) _v = -_v; \
-			sv += _v; \
-		} else { \
-			float _v = (float)dx * _sp; \
-			if (inv) _v = -_v; \
-			sh += _v; \
-		} \
+		float _s = (float)num / (float)denom; \
+		sv *= _s; sh *= _s; \
 	}
 
-					EDGE_CONTRIB(CONFIG_TPS43_EDGE_LEFT_PCT,   abs_x < el, CONFIG_TPS43_EDGE_LEFT_AXIS,   CONFIG_TPS43_EDGE_LEFT_SPEED_NUM,   CONFIG_TPS43_EDGE_LEFT_SPEED_DENOM,   IS_ENABLED(CONFIG_TPS43_EDGE_LEFT_INVERT),   tdx, tdy)
-					EDGE_CONTRIB(CONFIG_TPS43_EDGE_RIGHT_PCT,  abs_x > er, CONFIG_TPS43_EDGE_RIGHT_AXIS,  CONFIG_TPS43_EDGE_RIGHT_SPEED_NUM,  CONFIG_TPS43_EDGE_RIGHT_SPEED_DENOM,  IS_ENABLED(CONFIG_TPS43_EDGE_RIGHT_INVERT),  tdx, tdy)
-					EDGE_CONTRIB(CONFIG_TPS43_EDGE_TOP_PCT,    abs_y < et, CONFIG_TPS43_EDGE_TOP_AXIS,    CONFIG_TPS43_EDGE_TOP_SPEED_NUM,   CONFIG_TPS43_EDGE_TOP_SPEED_DENOM,   IS_ENABLED(CONFIG_TPS43_EDGE_TOP_INVERT),    tdx, tdy)
-					EDGE_CONTRIB(CONFIG_TPS43_EDGE_BOTTOM_PCT, abs_y > eb, CONFIG_TPS43_EDGE_BOTTOM_AXIS, CONFIG_TPS43_EDGE_BOTTOM_SPEED_NUM, CONFIG_TPS43_EDGE_BOTTOM_SPEED_DENOM, IS_ENABLED(CONFIG_TPS43_EDGE_BOTTOM_INVERT), tdx, tdy)
+					EDGE_SPEED(CONFIG_TPS43_EDGE_LEFT_PCT,   abs_x < el, CONFIG_TPS43_EDGE_LEFT_SPEED_NUM,   CONFIG_TPS43_EDGE_LEFT_SPEED_DENOM)
+					EDGE_SPEED(CONFIG_TPS43_EDGE_RIGHT_PCT,  abs_x > er, CONFIG_TPS43_EDGE_RIGHT_SPEED_NUM,  CONFIG_TPS43_EDGE_RIGHT_SPEED_DENOM)
+					EDGE_SPEED(CONFIG_TPS43_EDGE_TOP_PCT,    abs_y < et, CONFIG_TPS43_EDGE_TOP_SPEED_NUM,   CONFIG_TPS43_EDGE_TOP_SPEED_DENOM)
+					EDGE_SPEED(CONFIG_TPS43_EDGE_BOTTOM_PCT, abs_y > eb, CONFIG_TPS43_EDGE_BOTTOM_SPEED_NUM, CONFIG_TPS43_EDGE_BOTTOM_SPEED_DENOM)
 
-#undef EDGE_CONTRIB
+					/* Default speed if not in any active edge zone */
+					if (!((CONFIG_TPS43_EDGE_LEFT_PCT > 0 && abs_x < el) ||
+					      (CONFIG_TPS43_EDGE_RIGHT_PCT > 0 && abs_x > er) ||
+					      (CONFIG_TPS43_EDGE_TOP_PCT > 0 && abs_y < et) ||
+					      (CONFIG_TPS43_EDGE_BOTTOM_PCT > 0 && abs_y > eb))) {
+						sv *= 0.1f;
+						sh *= 0.1f;
+					}
+
+#undef EDGE_SPEED
 
 					mouse_wheel   += (int)sv;
 					mouse_wheel_h += (int)sh;
