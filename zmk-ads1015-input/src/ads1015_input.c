@@ -97,13 +97,25 @@ static void ads1015_poll_handler(struct k_work *work)
         data->center_y = y;
         data->calibrated = true;
         LOG_INF("ADS1015 center: X=%d Y=%d", data->center_x, data->center_y);
-        input_report_key(data->dev, INPUT_BTN_TOUCH, 1, true, K_NO_WAIT);
     }
 
-    input_report_abs(data->dev, INPUT_ABS_X, x, false, K_NO_WAIT);
-    input_report_abs(data->dev, INPUT_ABS_Y, y, true, K_NO_WAIT);
+    int16_t dx = x - data->center_x;
+    int16_t dy = y - data->center_y;
 
-    LOG_DBG("ADS1015 X=%d Y=%d", x, y);
+    int16_t deadzone = 200;
+    if (dx > -deadzone && dx < deadzone) dx = 0;
+    if (dy > -deadzone && dy < deadzone) dy = 0;
+
+    dx = dx / 100;
+    dy = dy / 100;
+
+    if (dx != 0 || dy != 0) {
+        input_report_rel(data->dev, INPUT_REL_X, dx, false, K_NO_WAIT);
+        input_report_rel(data->dev, INPUT_REL_Y, dy, true, K_NO_WAIT);
+        LOG_INF("ADS1015 move dx=%d dy=%d", dx, dy);
+    }
+
+    LOG_DBG("ADS1015 X=%d Y=%d dx=%d dy=%d", x, y, dx, dy);
 
     k_work_schedule(&data->work, K_MSEC(cfg->interval_ms));
 }
