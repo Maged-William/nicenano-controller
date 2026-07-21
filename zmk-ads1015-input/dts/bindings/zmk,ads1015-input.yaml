@@ -6,10 +6,6 @@ properties:
   label:
     type: string
     required: true
-  reg:
-    type: array
-    required: true
-    description: I2C slave address
   channel-x:
     type: int
     default: 0
@@ -18,7 +14,7 @@ properties:
     type: int
     default: 1
     description: ADC channel for Y axis (0-3)
-    update-interval-ms:
+  update-interval-ms:
     type: int
     default: 3
     description: Polling interval in milliseconds
