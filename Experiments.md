@@ -19,4 +19,4 @@
 | Exp15 | ✅ Complete | 1-finger edge scroll on TPS43 — 4 configurable edges (L/R/T/B) with per-edge axis, speed, invert; no FSM changes |
 | Exp16 | ✅ Complete | 49E linear Hall effect sensors on ADS1015 — decoupling analysis, 128 SPS data rate, zero-offset calibration, replacing one joystick |
 | Exp17 | ✅ Complete | Initial ZMK migration — my_shield 5×5 unibody, ZMK build-user-config CI, `main` branch, module structure |
-| Exp18 | 🔄 In Progress | Migrate ADS1015 I2C ADC to ZMK — joystick-as-mouse via zmk-ads1015-input module |
+| Exp18 | ✅ Complete | Migrate ADS1015 I2C ADC to ZMK — joystick-as-mouse via zmk-ads1015-input module |
