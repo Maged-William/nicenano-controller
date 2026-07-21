@@ -7,7 +7,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: ghcr.io/zmkfirmware/zmk-build-arm:stable
+    container: zmkfirmware/zmk-build-arm:stable
     steps:
       - uses: actions/checkout@v4
 
