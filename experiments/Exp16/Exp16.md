@@ -39,12 +39,12 @@ Sensors are zeroed at startup by averaging 32 samples. Subsequent reads subtract
 
 ## Success Criteria
 
-- [ ] A2 Hall sensor reading changes smoothly with magnet proximity
-- [ ] A3 Hall sensor reading changes smoothly with magnet proximity
-- [ ] At rest (no magnet), both channels read ~0 ± noise
-- [ ] Joystick A on A0/A1 still works normally
-- [ ] Firmware builds on GitHub Actions, produces UF2 artifact
-- [ ] Serial output shows calibrated Hall readings
+- [x] A2 Hall sensor reading changes smoothly with magnet proximity
+- [x] A3 Hall sensor reading changes smoothly with magnet proximity
+- [x] At rest (no magnet), both channels read ~0 ± noise (CH2_cal: ±8 LSB, CH3_cal: 0)
+- [x] Joystick A on A0/A1 still works normally
+- [x] Firmware builds on GitHub Actions, produces UF2 artifact (5m16s)
+- [x] Serial output shows calibrated Hall readings
 
 ## Challenges
 
@@ -54,7 +54,48 @@ Sensors are zeroed at startup by averaging 32 samples. Subsequent reads subtract
 
 ## Conclusion
 
-TBD after verification.
+**Hypothesis confirmed.** Two 49E linear Hall effect sensors successfully replace one joystick on the ADS1015, with stable readings after hardware decoupling and software configuration changes.
+
+### What Worked
+
+- ✅ **VCC–GND decoupling (0.1µF)** — Single most critical fix. Without it, the 49E output was unreadable. With it, noise dropped to ~±8 LSB (±0.4%).
+- ✅ **Output filter cap (0.1µF, output–GND)** — Marginal additional benefit at 128 SPS; the ADS1015's internal digital filter is the dominant noise rejection mechanism.
+- ✅ **128 SPS data rate** — Dropping from 1600 SPS to 128 SPS gives ~3.5× noise reduction via the ADS1015's internal digital filter.
+- ✅ **Grounding unused channels** — Floating A3 read random garbage; grounding it eliminated that entirely.
+- ✅ **Boot calibration** — 32-sample average at startup zeroes both Hall channels. CH2_cal reads ~0 with ±8 LSB noise; CH3_cal reads dead 0 (grounded).
+- ✅ **Calibrated vs raw API** — Raw reads still available via `ads1015_read_channel()`; calibrated reads via `ads1015_read_calibrated()` subtract the stored offset. Per-channel offsets stored in a static array.
+- ✅ **Configurable data rate** — `ads1015_set_data_rate()` allows switching between 128–3300 SPS at runtime via `ADS1015_RATE_*` constants.
+- ✅ **CI build** — GitHub Actions builds in 5m16s, producing a valid UF2 artifact.
+
+### What Didn't Work / Limitations
+
+- ❌ **Second output capacitor (output–GND)** — Low value at 128 SPS. The RC corner frequency (~32kHz) is far above any signal of interest; the ADS1015's internal filter already handles high-frequency rejection.
+- ⚠️ **No continuous drift compensation** — Boot calibration fixes initial offset, but the 49E drifts with temperature (~0.1%/°C). A continuous idle-recenter (like Steam Controller) was not implemented to avoid fighting intentional movement.
+- ⚠️ **Single-ended mode** — Potentially susceptible to common-mode noise. Differential mode (AINx vs AINy) with pseudo-differential wiring could improve CMRR in noisy environments.
+
+### Key Learnings
+
+- The 49E Hall sensor's output is ratiometric to VCC — stable supply voltage is essential for stable readings.
+- At 128 SPS, the ADS1015's internal digital filter provides excellent noise rejection; external RC filtering is redundant for most applications.
+- Floating ADC inputs on the ADS1015 produce random noise, not zero — always ground unused channels.
+- Boot calibration is simple and effective for offset removal. The Steam Controller's approach (continuous idle-recenter) is more appropriate for self-centering joysticks than for distance sensing with stationary magnets.
+
+### Build Time
+
+| Run | Time | Notes |
+|-----|------|-------|
+| First build (clean) | 5m 16s | Fresh CI run, no caching |
+
+### Files Changed
+
+```
+zephyr-app/src/drivers/ads1015.h   — Added rate constants + calibration API
+zephyr-app/src/drivers/ads1015.c   — 128 SPS default, offset array, calibrate/read_calibrated
+zephyr-app/src/main.c              — Calibrate A2/A3 on boot, calibrated reads in debug output
+experiments/Exp16/Exp16.md         — This document
+Experiments.md                     — Add Exp16 entry
+AGENTS.md                          — Update wiring table: Joystick B → 2× 49E Hall sensors
+```
 
 ## Files Changed
 

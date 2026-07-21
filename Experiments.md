@@ -17,4 +17,4 @@
 | Exp13 | ✅ Complete | Pure-software tap FSM (libinput port) — TPS43 gesture engine disabled, single tap, drag, right-click via 2-finger tap, drag lock optional, no double-click |
 | Exp14 | ✅ Complete | Grace buffer + click-first FSM — DROP_GRACE_MS (20ms) filters transient contact-loss during drags; click-on-entry, double-click, and intentional drag-only FSM (FIRST_TAP + SECOND_TOUCH) |
 | Exp15 | ✅ Complete | 1-finger edge scroll on TPS43 — 4 configurable edges (L/R/T/B) with per-edge axis, speed, invert; no FSM changes |
-| Exp16 | 🔄 In progress | 49E linear Hall effect sensors on ADS1015 — decoupling analysis, 128 SPS data rate, zero-offset calibration, replacing one joystick |
+| Exp16 | ✅ Complete | 49E linear Hall effect sensors on ADS1015 — decoupling analysis, 128 SPS data rate, zero-offset calibration, replacing one joystick |

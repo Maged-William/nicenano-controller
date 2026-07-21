@@ -25,14 +25,14 @@ The following is how im currently wiring things:
 | P0.20 | SCL | I2C Clock |
 | float | ADDR | I2C Address |
 
-| i2c ADC | joystick A | joystick B |
-| --- | --- | --- |
-| A0 | X | |
-| A1 | Y | |
-| A2 | | X |
-| A3 | | Y |
-| GND | GND | GND |
-| VCC | VCC | VCC |
+| i2c ADC | joystick A | Hall sensor 1 | Hall sensor 2 |
+| --- | --- | --- | --- |
+| A0 | X | | |
+| A1 | Y | | |
+| A2 | | OUT | |
+| A3 | | | OUT |
+| GND | GND | GND (+ 0.1µF to VCC) | GND (+ 0.1µF to VCC) |
+| VCC | VCC | VCC (+ 0.1µF to GND) | VCC (+ 0.1µF to GND) |
 
 | nice!nano pin  | i2c Azoteq TPS43 |
 | --- | --- |
