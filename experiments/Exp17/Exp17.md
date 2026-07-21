@@ -33,10 +33,11 @@ Diode direction: **COL2ROW**
 
 - [x] ZMK project inits + west updates successfully in CI
 - [x] Firmware builds with no errors, produces UF2 artifact (390KB)
-- [ ] nice!nano enumerates as a HID keyboard on boot *(not yet tested — no hardware wired)*
+- [x] nice!nano enumerates as a HID keyboard on boot
 - [ ] All 25 keys register keypresses *(not yet tested — no matrix wired)*
-- [x] CI build time recorded: 4m 9s (first successful build after west cache)
-- [ ] Flashing via Leonardo `b` + copy UF2 works *(not yet tested)*
+- [x] CI build time recorded: 4m 9s (first successful build, 1m45s cached)
+- [x] Flashing via Leonardo `b` + copy UF2 works (COM29 → G: drive)
+- [ ] Serial monitor output over USB *(needs CDC ACM config, ZMK shell targets UART pins not USB)*
 
 ## Challenges
 
