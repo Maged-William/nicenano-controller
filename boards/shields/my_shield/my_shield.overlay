@@ -56,10 +56,29 @@
     };
 };
 
+#define HID_IO_USAGE_FWD_TO_JOYSTICK 2
+
 / {
-    pointing {
+    zip_fwd_to_joystick: zip_forward_fwd_to_joystick {
+        compatible = "zmk,input-processor-fwd-to-hid-io";
+        #input-processor-cells = <0>;
+        usage = <HID_IO_USAGE_FWD_TO_JOYSTICK>;
+    };
+
+    ads1015_joystick_il {
         compatible = "zmk,input-listener";
-        status = "okay";
         device = <&ads1015>;
+        input-processors = <&zip_fwd_to_joystick>;
+    };
+
+    hidiokp: hid_io_key_press {
+        compatible = "zmk,behavior-hid-io-key-press";
+        #binding-cells = <1>;
+    };
+
+    hidiokp_ibl {
+        compatible = "zmk,input-behavior-listener";
+        device = <&hidiokp>;
+        input-processors = <&zip_fwd_to_joystick>;
     };
 };

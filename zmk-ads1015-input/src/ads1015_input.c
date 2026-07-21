@@ -4,6 +4,7 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/i2c.h>
 #include <zephyr/input/input.h>
+#include <zephyr/sys/util.h>
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(ads1015_input, CONFIG_ZMK_ADS1015_INPUT_LOG_LEVEL);
@@ -32,6 +33,8 @@ struct ads1015_input_data {
     int16_t center_x;
     int16_t center_y;
     bool calibrated;
+    int8_t joy_x;
+    int8_t joy_y;
 };
 
 static int ads1015_write_reg(const struct device *i2c, uint16_t addr,
@@ -99,20 +102,26 @@ static void ads1015_poll_handler(struct k_work *work)
         LOG_INF("ADS1015 center: X=%d Y=%d", data->center_x, data->center_y);
     }
 
-    int16_t dx = x - data->center_x;
-    int16_t dy = y - data->center_y;
+    int16_t dx_raw = x - data->center_x;
+    int16_t dy_raw = y - data->center_y;
 
-    int16_t deadzone = 500;
-    if (dx > -deadzone && dx < deadzone) dx = 0;
-    if (dy > -deadzone && dy < deadzone) dy = 0;
+    int8_t target_x = CLAMP(dx_raw / 16, -127, 127);
+    int8_t target_y = CLAMP(dy_raw / 16, -127, 127);
 
-    dx = dx / 1000;
-    dy = dy / 1000;
+    if (target_x > -3 && target_x < 3) target_x = 0;
+    if (target_y > -3 && target_y < 3) target_y = 0;
 
-    if (dx != 0 || dy != 0) {
-        input_report_rel(data->dev, INPUT_REL_X, dx, false, K_NO_WAIT);
-        input_report_rel(data->dev, INPUT_REL_Y, dy, true, K_NO_WAIT);
-        LOG_INF("ADS1015 move dx=%d dy=%d", dx, dy);
+    int8_t dx = target_x - data->joy_x;
+    int8_t dy = target_y - data->joy_y;
+    data->joy_x += dx;
+    data->joy_y += dy;
+
+    input_report_rel(data->dev, INPUT_REL_X, dx, false, K_NO_WAIT);
+    input_report_rel(data->dev, INPUT_REL_Y, dy, true, K_NO_WAIT);
+
+    if (dx || dy) {
+        LOG_DBG("joy target=%d,%d pos=%d,%d delta=%d,%d",
+                target_x, target_y, data->joy_x, data->joy_y, dx, dy);
     }
 
     LOG_DBG("ADS1015 X=%d Y=%d dx=%d dy=%d", x, y, dx, dy);
