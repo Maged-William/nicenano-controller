@@ -102,12 +102,12 @@ static void ads1015_poll_handler(struct k_work *work)
     int16_t dx = x - data->center_x;
     int16_t dy = y - data->center_y;
 
-    int16_t deadzone = 200;
+    int16_t deadzone = 2000;
     if (dx > -deadzone && dx < deadzone) dx = 0;
     if (dy > -deadzone && dy < deadzone) dy = 0;
 
-    dx = dx / 100;
-    dy = dy / 100;
+    dx = dx / 1000;
+    dy = dy / 1000;
 
     if (dx != 0 || dy != 0) {
         input_report_rel(data->dev, INPUT_REL_X, dx, false, K_NO_WAIT);
