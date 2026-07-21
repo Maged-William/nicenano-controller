@@ -12,6 +12,12 @@
 # Background
 
 Using a nice nano V2 nrf52840 microcontroller, i have an i2c ADC module ADS1015 12-bit, and 2 BMI160 sensors over SPI.
+Now we are in a ZMK migration, so most of the time you will need to check the following from zmk docs:
+
+https://web.archive.org/web/20260626150914/https://zmk.dev
+https://web.archive.org/web/20260626150914/https://zmk.dev/docs/development/usb-logging?operating-system=win
+https://github.com/badjeff/zmk-hid-io
+https://github.com/badjeff/zmk-feature-split-esb
 
 # Wiring
 
@@ -136,6 +142,28 @@ $port.Close()
 ```
 Or use Putty
 
+For ZMK:
+
+```powershell
+$ $port = New-Object System.IO.Ports.SerialPort "COM18",115200,None,8,1
+$port.ReadTimeout = 10000
+$port.DtrEnable = $true
+$port.Open()
+Start-Sleep -Milliseconds 300
+Write-Output "Listening for key events... (press keys now!)"
+try {
+    $data = $port.ReadExisting()
+    if ($data) { Write-Output "=== KEY EVENTS ==="; Write-Output $data }
+    else { Write-Output "(no events yet, keep pressing...)" }
+} catch {}
+Start-Sleep -Seconds 3
+try {
+    $data = $port.ReadExisting()
+    if ($data) { Write-Output "=== MORE EVENTS ==="; Write-Output $data }
+    else { Write-Output "(still no events)" }
+} catch {}
+$port.Close()
+```
 
 # Experiments
 
