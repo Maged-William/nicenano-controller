@@ -63,11 +63,31 @@ Same as Exp18 — no hardware changes:
 
 | Attempt | Issue | Fix |
 |---------|-------|-----|
+| 1 | Initial zmk-hid-io integration — joystick detected but REL-axis accumulator desyncs | Switch to ABS axes in descriptor |
+| 2 | Per-axis squared curve causes diagonal distortion | Add radial (magnitude-based) curve |
+| 3 | Radial curve still feels non-linear | Remove all curves, pure linear divisor-100, deadzone-4 |
+| 4 | 16-bit HID axes (±32767) with squared curve — worse diagonal feel | Revert to 8-bit, keep divisor-100 linear |
+| 5 | Pure linear 8-bit — smooth but values repeat at 45° cardinals | Identified quantization: 100 ADC units per HID step |
+| 6 | 16-bit HID axes pure linear (divisor 16384) — no more mid-range sticking but can't reach ±1.000 | Divisor 16384 → 13000 |
+| 7 | Divisor 13000 + 16-bit — ±1.000 reachable but clamp at edges eats dither | Divisor → 13250 then 13500 then 13600, add ±8 ADC dither |
+| 8 | RAW mode: ADC displacement sent directly, zero processing | **Key finding: raw ADC repeats values for 3-30 frames** |
 
 ## Known-Good Commit
 
-TBD
+`f641ccf` — RAW mode final test
 
 ## Conclusion
 
-TBD
+**Status: Successful finding — hardware limitation identified.**
+
+The perceived "snapping" at the 12/3/6/9 o'clock positions and 45° diagonals is caused by the **KY-023 joystick module** itself, not the firmware:
+
+1. **12-bit ADC quantization**: The ADS1015 at ±4.096V PGA produces only 2048 distinct values (16 register units per step). With a joystick throw of ~13000 register units, each 12-bit code represents ~6.4 ADC units of physical throw. When moving slowly, the ADC reads the same code for 3-30 consecutive polls (9-90ms).
+
+2. **Mechanical square gate**: The KY-023 uses a plastic restrictor that creates a rectangular path — 45° diagonal snapping is the stick hitting the gate edge, not firmware.
+
+3. **Carbon-track potentiometers**: Wiper contact noise and friction cause voltage micro-stutters that the ADC faithfully digitizes.
+
+All firmware approaches were tried: 8-bit/16-bit axes, divisor scaling, curves (per-axis and radial), EMA smoothing, dithering, deadzone tuning — none could overcome the hardware limit because **the ADC simply reads the same voltage repeatedly**.
+
+**Recommendation**: Replace the KY-023 with a hall-effect joystick (e.g., ALPS with magnetic sensors, Gulikit, or PS5-style) for smooth, gapless readings across a circular gate.

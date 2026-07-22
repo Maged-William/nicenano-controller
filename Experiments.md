@@ -20,4 +20,4 @@
 | Exp16 | ✅ Complete | 49E linear Hall effect sensors on ADS1015 — decoupling analysis, 128 SPS data rate, zero-offset calibration, replacing one joystick |
 | Exp17 | ✅ Complete | Initial ZMK migration — my_shield 5×5 unibody, ZMK build-user-config CI, `main` branch, module structure |
 | Exp18 | ✅ Complete | Migrate ADS1015 I2C ADC to ZMK — joystick-as-mouse via zmk-ads1015-input module |
-| Exp19 | 🔄 In progress | ADS1015 game joystick via zmk-hid-io — HID gamepad with 6 axes + 8 buttons |
+| Exp19 | ✅ Complete | ADS1015 game joystick via zmk-hid-io — HID gamepad with 6 axes + 8 buttons; snapping traced to KY-023 + 12-bit ADC hardware limitation |
