@@ -105,8 +105,8 @@ static void ads1015_poll_handler(struct k_work *work)
     int16_t dx_raw = x - data->center_x;
     int16_t dy_raw = y - data->center_y;
 
-    int16_t target_x = CLAMP((dx_raw * 32767) / 16384, -32767, 32767);
-    int16_t target_y = CLAMP((dy_raw * 32767) / 16384, -32767, 32767);
+    int16_t target_x = CLAMP((dx_raw * 32767) / 13000, -32767, 32767);
+    int16_t target_y = CLAMP((dy_raw * 32767) / 13000, -32767, 32767);
 
     if (dx_raw > -400 && dx_raw < 400) target_x = 0;
     if (dy_raw > -400 && dy_raw < 400) target_y = 0;
