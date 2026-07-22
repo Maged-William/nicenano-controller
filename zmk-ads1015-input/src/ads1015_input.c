@@ -33,8 +33,6 @@ struct ads1015_input_data {
     int16_t center_x;
     int16_t center_y;
     bool calibrated;
-    int8_t joy_x;
-    int8_t joy_y;
     int32_t smooth_x;
     int32_t smooth_y;
 };
@@ -118,17 +116,10 @@ static void ads1015_poll_handler(struct k_work *work)
     if (target_x > -8 && target_x < 8) target_x = 0;
     if (target_y > -8 && target_y < 8) target_y = 0;
 
-    int8_t dx = target_x - data->joy_x;
-    int8_t dy = target_y - data->joy_y;
-    data->joy_x += dx;
-    data->joy_y += dy;
+    input_report(data->dev, INPUT_EV_ABS, INPUT_ABS_X, target_x, false, K_NO_WAIT);
+    input_report(data->dev, INPUT_EV_ABS, INPUT_ABS_Y, target_y, true, K_NO_WAIT);
 
-    if (dx || dy) {
-        input_report_rel(data->dev, INPUT_REL_X, dx, false, K_NO_WAIT);
-        input_report_rel(data->dev, INPUT_REL_Y, dy, true, K_NO_WAIT);
-        LOG_DBG("joy target=%d,%d pos=%d,%d delta=%d,%d",
-                target_x, target_y, data->joy_x, data->joy_y, dx, dy);
-    }
+    LOG_DBG("joy abs X=%d Y=%d", target_x, target_y);
 
     k_work_schedule(&data->work, K_MSEC(cfg->interval_ms));
 }

@@ -1,0 +1,13 @@
+# Copyright (c) 2020 The ZMK Contributors
+# SPDX-License-Identifier: MIT
+
+description: Input Behavior To Intercept As HID IO Joystick Event
+
+compatible: "zmk,input-behavior-fwd-to-hid-io"
+
+include: zero_param.yaml
+
+properties:
+  usage:
+    type: int
+    default: 0
