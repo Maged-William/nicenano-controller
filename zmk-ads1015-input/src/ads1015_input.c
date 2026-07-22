@@ -35,6 +35,8 @@ struct ads1015_input_data {
     bool calibrated;
     int8_t joy_x;
     int8_t joy_y;
+    int32_t smooth_x;
+    int32_t smooth_y;
 };
 
 static int ads1015_write_reg(const struct device *i2c, uint16_t addr,
@@ -98,33 +100,35 @@ static void ads1015_poll_handler(struct k_work *work)
     if (!data->calibrated) {
         data->center_x = x;
         data->center_y = y;
+        data->smooth_x = x;
+        data->smooth_y = y;
         data->calibrated = true;
         LOG_INF("ADS1015 center: X=%d Y=%d", data->center_x, data->center_y);
+    } else {
+        data->smooth_x = (data->smooth_x * 7 + x) / 8;
+        data->smooth_y = (data->smooth_y * 7 + y) / 8;
     }
 
-    int16_t dx_raw = x - data->center_x;
-    int16_t dy_raw = y - data->center_y;
+    int16_t dx_raw = (int16_t)(data->smooth_x - data->center_x);
+    int16_t dy_raw = (int16_t)(data->smooth_y - data->center_y);
 
     int8_t target_x = CLAMP(dx_raw / 16, -127, 127);
     int8_t target_y = CLAMP(dy_raw / 16, -127, 127);
 
-    if (target_x > -3 && target_x < 3) target_x = 0;
-    if (target_y > -3 && target_y < 3) target_y = 0;
+    if (target_x > -8 && target_x < 8) target_x = 0;
+    if (target_y > -8 && target_y < 8) target_y = 0;
 
     int8_t dx = target_x - data->joy_x;
     int8_t dy = target_y - data->joy_y;
     data->joy_x += dx;
     data->joy_y += dy;
 
-    input_report_rel(data->dev, INPUT_REL_X, dx, false, K_NO_WAIT);
-    input_report_rel(data->dev, INPUT_REL_Y, dy, true, K_NO_WAIT);
-
     if (dx || dy) {
+        input_report_rel(data->dev, INPUT_REL_X, dx, false, K_NO_WAIT);
+        input_report_rel(data->dev, INPUT_REL_Y, dy, true, K_NO_WAIT);
         LOG_DBG("joy target=%d,%d pos=%d,%d delta=%d,%d",
                 target_x, target_y, data->joy_x, data->joy_y, dx, dy);
     }
-
-    LOG_DBG("ADS1015 X=%d Y=%d dx=%d dy=%d", x, y, dx, dy);
 
     k_work_schedule(&data->work, K_MSEC(cfg->interval_ms));
 }
