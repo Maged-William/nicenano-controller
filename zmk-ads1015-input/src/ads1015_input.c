@@ -4,7 +4,7 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/i2c.h>
 #include <zephyr/input/input.h>
-#include <math.h>
+
 #include <zephyr/sys/util.h>
 #include <zephyr/logging/log.h>
 
@@ -110,16 +110,6 @@ static void ads1015_poll_handler(struct k_work *work)
 
     if (target_x > -4 && target_x < 4) target_x = 0;
     if (target_y > -4 && target_y < 4) target_y = 0;
-
-    if (target_x || target_y) {
-        int32_t mag_sq = (int32_t)target_x * target_x + (int32_t)target_y * target_y;
-        int32_t mag = (int32_t)sqrtf((float)mag_sq);
-        if (mag > 0) {
-            int32_t curved_mag = (mag * mag) / 127;
-            target_x = (int16_t)((target_x * curved_mag) / mag);
-            target_y = (int16_t)((target_y * curved_mag) / mag);
-        }
-    }
 
     input_report(data->dev, INPUT_EV_ABS, INPUT_ABS_X, target_x, false, K_NO_WAIT);
     input_report(data->dev, INPUT_EV_ABS, INPUT_ABS_Y, target_y, true, K_NO_WAIT);
