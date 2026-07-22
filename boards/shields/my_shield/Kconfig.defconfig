@@ -1,6 +1,6 @@
 if SHIELD_MY_SHIELD
 
 config ZMK_KEYBOARD_NAME
-	default "my_shield"
+	default "nano-joy"
 
 endif
