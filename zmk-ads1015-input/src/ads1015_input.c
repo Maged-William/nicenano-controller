@@ -33,8 +33,7 @@ struct ads1015_input_data {
     int16_t center_x;
     int16_t center_y;
     bool calibrated;
-    int32_t smooth_x;
-    int32_t smooth_y;
+
 };
 
 static int ads1015_write_reg(const struct device *i2c, uint16_t addr,
@@ -98,17 +97,12 @@ static void ads1015_poll_handler(struct k_work *work)
     if (!data->calibrated) {
         data->center_x = x;
         data->center_y = y;
-        data->smooth_x = x;
-        data->smooth_y = y;
         data->calibrated = true;
         LOG_INF("ADS1015 center: X=%d Y=%d", data->center_x, data->center_y);
-    } else {
-        data->smooth_x = (data->smooth_x * 3 + x) / 4;
-        data->smooth_y = (data->smooth_y * 3 + y) / 4;
     }
 
-    int16_t dx_raw = (int16_t)(data->smooth_x - data->center_x);
-    int16_t dy_raw = (int16_t)(data->smooth_y - data->center_y);
+    int16_t dx_raw = x - data->center_x;
+    int16_t dy_raw = y - data->center_y;
 
     int8_t target_x = CLAMP(dx_raw / 100, -127, 127);
     int8_t target_y = CLAMP(dy_raw / 100, -127, 127);
