@@ -4,6 +4,7 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/i2c.h>
 #include <zephyr/input/input.h>
+#include <zephyr/sys/printk.h>
 #include <zephyr/logging/log.h>
 
 #include "tps43_regs.h"
@@ -128,13 +129,13 @@ static void tps43_poll_handler(struct k_work *work)
 		if (left_down != data->prev_button_down) {
 			data->prev_button_down = left_down;
 			input_report(dev, INPUT_EV_KEY, INPUT_BTN_LEFT, left_down ? 1 : 0, false, K_NO_WAIT);
-			LOG_DBG("BTN_LEFT: %s", left_down ? "DOWN" : "UP");
+			printk("BTN_LEFT: %s\n", left_down ? "DOWN" : "UP");
 		}
 
 		if (rc) {
 			input_report(dev, INPUT_EV_KEY, INPUT_BTN_RIGHT, 1, true, K_NO_WAIT);
 			input_report(dev, INPUT_EV_KEY, INPUT_BTN_RIGHT, 0, true, K_NO_WAIT);
-			LOG_DBG("BTN_RIGHT: click");
+			printk("BTN_RIGHT: click\n");
 		}
 
 		if (dc) {
@@ -142,7 +143,7 @@ static void tps43_poll_handler(struct k_work *work)
 			input_report(dev, INPUT_EV_KEY, INPUT_BTN_LEFT, 0, true, K_NO_WAIT);
 			input_report(dev, INPUT_EV_KEY, INPUT_BTN_LEFT, 1, true, K_NO_WAIT);
 			input_report(dev, INPUT_EV_KEY, INPUT_BTN_LEFT, 0, true, K_NO_WAIT);
-			LOG_DBG("BTN_LEFT: double-click");
+			printk("BTN_LEFT: double-click\n");
 		}
 	}
 #else
@@ -174,8 +175,8 @@ static void tps43_poll_handler(struct k_work *work)
 		input_report(dev, INPUT_EV_REL, INPUT_REL_X, (int)mx, false, K_NO_WAIT);
 		input_report(dev, INPUT_EV_REL, INPUT_REL_Y, (int)my, true, K_NO_WAIT);
 
-		LOG_DBG("rel=%d,%d abs=%u,%u fg=%u mvt=%d,%d",
-		        rel_x, rel_y, abs_x, abs_y, finger_count, (int)mx, (int)my);
+		printk("TP: rel=%d,%d abs=%u,%u fg=%u mvt=%d,%d\n",
+		       rel_x, rel_y, abs_x, abs_y, finger_count, (int)mx, (int)my);
 	}
 
 	k_work_schedule(&data->work, K_MSEC(cfg->interval_ms));

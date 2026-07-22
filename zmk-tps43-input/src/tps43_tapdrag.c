@@ -1,5 +1,7 @@
 #include "tps43_tapdrag.h"
 
+#include <zephyr/sys/printk.h>
+
 #define TAP_TIMEOUT_MS              CONFIG_ZMK_TPS43_INPUT_TAP_TIMEOUT_MS
 #define DOUBLE_CLICK_TIMEOUT_MS     CONFIG_ZMK_TPS43_INPUT_DOUBLE_CLICK_TIMEOUT_MS
 #define DRAGLOCK_TIMEOUT_MS         CONFIG_ZMK_TPS43_INPUT_DRAGLOCK_TIMEOUT_MS
@@ -25,6 +27,15 @@ enum tap_event {
 	TAP_EVENT_TIMEOUT,
 };
 
+static const char * const state_names[] = {
+	"IDLE", "TOUCH", "TOUCH_2", "FIRST_TAP",
+	"SECOND_TOUCH", "DRAGGING", "DRAG_WAIT", "DEAD"
+};
+
+static const char * const event_names[] = {
+	"TOUCH", "RELEASE", "MOTION", "TIMEOUT"
+};
+
 static enum tap_state state;
 static uint64_t touch_start_ms;
 static uint16_t touch_start_x;
@@ -38,6 +49,8 @@ static uint64_t second_touch_start_ms;
 static uint16_t second_touch_start_x;
 static uint16_t second_touch_start_y;
 static uint8_t prev_fg_count;
+
+static enum tap_state prev_state = 0xff;
 
 static inline uint32_t abs_diff(uint16_t a, uint16_t b)
 {
@@ -54,6 +67,7 @@ void tps43_tapdrag_init(void)
 	state = TAP_STATE_IDLE;
 	button_down = false;
 	prev_fg_count = 0xff;
+	prev_state = 0xff;
 	lift_ms = 0;
 	second_touch_start_ms = 0;
 	second_touch_start_x = 0;
@@ -84,6 +98,13 @@ bool tps43_tapdrag_update(bool finger_down, uint8_t finger_count,
 		}
 	} else {
 		event = TAP_EVENT_TIMEOUT;
+	}
+
+	if (state != prev_state || event == TAP_EVENT_TOUCH || event == TAP_EVENT_RELEASE) {
+		printk("TD: %s ev=%s fg=%d,%d xy=%u,%u @%llu\n",
+		       state_names[state], event_names[event],
+		       prev_fg, finger_count, abs_x, abs_y, now_ms);
+		prev_state = state;
 	}
 
 	switch (state) {
