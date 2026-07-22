@@ -106,7 +106,7 @@ static void ads1015_poll_handler(struct k_work *work)
         LOG_INF("ADS1015 center: X=%d Y=%d", data->center_x, data->center_y);
     }
 
-    int16_t dx_raw = (x - data->center_x) + dither;
+    int16_t dx_raw = -(x - data->center_x) + dither;
     int16_t dy_raw = (y - data->center_y) + dither;
 
     int16_t target_x = CLAMP((dx_raw * 32767) / 13000, -32767, 32767);
