@@ -92,6 +92,10 @@ static void ads1015_poll_handler(struct k_work *work)
         CONTAINER_OF(dwork, struct ads1015_input_data, work);
     const struct ads1015_input_config *cfg = data->dev->config;
 
+    static uint32_t lcg = 1;
+    lcg = lcg * 1103515245 + 12345;
+    int16_t dither = (int16_t)(lcg & 0x0F) - 8;
+
     int16_t x = ads1015_read_channel(cfg->i2c_bus, cfg->i2c_addr, cfg->ch_x);
     int16_t y = ads1015_read_channel(cfg->i2c_bus, cfg->i2c_addr, cfg->ch_y);
 
@@ -102,8 +106,8 @@ static void ads1015_poll_handler(struct k_work *work)
         LOG_INF("ADS1015 center: X=%d Y=%d", data->center_x, data->center_y);
     }
 
-    int16_t dx_raw = x - data->center_x;
-    int16_t dy_raw = y - data->center_y;
+    int16_t dx_raw = (x - data->center_x) + dither;
+    int16_t dy_raw = (y - data->center_y) + dither;
 
     int16_t target_x = CLAMP((dx_raw * 32767) / 13000, -32767, 32767);
     int16_t target_y = CLAMP((dy_raw * 32767) / 13000, -32767, 32767);
