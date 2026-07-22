@@ -3,6 +3,13 @@ if(CONFIG_ZMK_ADS1015_INPUT)
   zephyr_library_sources(src/ads1015_input.c)
 endif()
 
+if(CONFIG_ZMK_TPS43_INPUT)
+  zephyr_library()
+  zephyr_library_sources(../zmk-tps43-input/src/tps43_input.c)
+  zephyr_library_sources(../zmk-tps43-input/src/tps43_tapdrag.c)
+  zephyr_library_sources(../zmk-tps43-input/src/tps43_edgescroll.c)
+endif()
+
 if ((NOT CONFIG_ZMK_SPLIT) OR CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
   zephyr_library_sources_ifdef(CONFIG_ZMK_BEHAVIOR_HID_IO_KEY_PRESS ../zmk-hid-io/src/behaviors/behavior_hid_io_key_press.c)
   zephyr_library_sources_ifdef(CONFIG_ZMK_INPUT_BEHAVIOR_FWD_TO_HID_IO ../zmk-hid-io/src/behaviors/input_behavior_fwd_to_hid_io.c)

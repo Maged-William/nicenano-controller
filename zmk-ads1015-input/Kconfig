@@ -19,6 +19,8 @@ config ZMK_ADS1015_INPUT_LOG_LEVEL
 
 endif
 
+source "../zmk-tps43-input/Kconfig"
+
 config ZMK_HID_IO
 	bool "Enable HID I/O"
 	default n
