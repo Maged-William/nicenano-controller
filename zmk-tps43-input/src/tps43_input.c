@@ -111,21 +111,11 @@ static void tps43_poll_handler(struct k_work *work)
 	input_report(dev, INPUT_EV_KEY, INPUT_BTN_TOUCH, touched ? 1 : 0, false, K_NO_WAIT);
 
 #if CONFIG_ZMK_TPS43_INPUT_EDGESCROLL
-	{
-		int wheel = 0, hwheel = 0;
-		bool in_edge = tps43_edgescroll_update(touched, abs_x, abs_y, rel_x, rel_y,
-		                                       &wheel, &hwheel);
-		if (in_edge) {
-			if (wheel) {
-				input_report(dev, INPUT_EV_REL, INPUT_REL_WHEEL, wheel, false, K_NO_WAIT);
-			}
-			if (hwheel) {
-				input_report(dev, INPUT_EV_REL, INPUT_REL_HWHEEL, hwheel, true, K_NO_WAIT);
-			}
-			k_work_schedule(&data->work, K_MSEC(cfg->interval_ms));
-			return;
-		}
-	}
+	int edge_wheel = 0, edge_hwheel = 0;
+	bool in_edge = tps43_edgescroll_update(touched, abs_x, abs_y, rel_x, rel_y,
+	                                       &edge_wheel, &edge_hwheel);
+#else
+	bool in_edge = false;
 #endif
 
 #if CONFIG_ZMK_TPS43_INPUT_TAPDRAG
@@ -154,11 +144,6 @@ static void tps43_poll_handler(struct k_work *work)
 			input_report(dev, INPUT_EV_KEY, INPUT_BTN_LEFT, 0, true, K_NO_WAIT);
 			LOG_DBG("BTN_LEFT: double-click");
 		}
-
-		if (left_down || rc || dc) {
-			k_work_schedule(&data->work, K_MSEC(cfg->interval_ms));
-			return;
-		}
 	}
 #else
 	(void)abs_x;
@@ -166,28 +151,32 @@ static void tps43_poll_handler(struct k_work *work)
 	(void)finger_count;
 #endif
 
-	if (!touched) {
-		k_work_schedule(&data->work, K_MSEC(cfg->interval_ms));
-		return;
-	}
-
-	float sens_num = CONFIG_ZMK_TPS43_INPUT_SENSITIVITY_NUM;
-	float sens_den = CONFIG_ZMK_TPS43_INPUT_SENSITIVITY_DENOM;
-	float mx = (float)rel_x * sens_num / sens_den;
-	float my = (float)rel_y * sens_num / sens_den;
+	if (in_edge) {
+		if (edge_wheel) {
+			input_report(dev, INPUT_EV_REL, INPUT_REL_WHEEL, edge_wheel, false, K_NO_WAIT);
+		}
+		if (edge_hwheel) {
+			input_report(dev, INPUT_EV_REL, INPUT_REL_HWHEEL, edge_hwheel, true, K_NO_WAIT);
+		}
+	} else if (touched) {
+		float sens_num = CONFIG_ZMK_TPS43_INPUT_SENSITIVITY_NUM;
+		float sens_den = CONFIG_ZMK_TPS43_INPUT_SENSITIVITY_DENOM;
+		float mx = (float)rel_x * sens_num / sens_den;
+		float my = (float)rel_y * sens_num / sens_den;
 
 #if CONFIG_ZMK_TPS43_INPUT_INVERT_X
-	mx = -mx;
+		mx = -mx;
 #endif
 #if CONFIG_ZMK_TPS43_INPUT_INVERT_Y
-	my = -my;
+		my = -my;
 #endif
 
-	input_report(dev, INPUT_EV_REL, INPUT_REL_X, (int)mx, false, K_NO_WAIT);
-	input_report(dev, INPUT_EV_REL, INPUT_REL_Y, (int)my, true, K_NO_WAIT);
+		input_report(dev, INPUT_EV_REL, INPUT_REL_X, (int)mx, false, K_NO_WAIT);
+		input_report(dev, INPUT_EV_REL, INPUT_REL_Y, (int)my, true, K_NO_WAIT);
 
-	LOG_DBG("rel=%d,%d abs=%u,%u fg=%u mvt=%d,%d",
-	        rel_x, rel_y, abs_x, abs_y, finger_count, (int)mx, (int)my);
+		LOG_DBG("rel=%d,%d abs=%u,%u fg=%u mvt=%d,%d",
+		        rel_x, rel_y, abs_x, abs_y, finger_count, (int)mx, (int)my);
+	}
 
 	k_work_schedule(&data->work, K_MSEC(cfg->interval_ms));
 }

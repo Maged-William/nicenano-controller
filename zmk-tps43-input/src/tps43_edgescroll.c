@@ -1,5 +1,7 @@
 #include "tps43_edgescroll.h"
 
+#include <zephyr/sys/util.h>
+
 static uint16_t abs_max_x;
 static uint16_t abs_max_y;
 static bool edge_scroll_mode;
@@ -17,6 +19,7 @@ bool tps43_edgescroll_update(bool touched, uint16_t abs_x, uint16_t abs_y,
                              int16_t rel_x, int16_t rel_y,
                              int *wheel, int *hwheel)
 {
+#if CONFIG_ZMK_TPS43_INPUT_EDGESCROLL
 	if (wheel)  *wheel = 0;
 	if (hwheel) *hwheel = 0;
 
@@ -55,7 +58,7 @@ bool tps43_edgescroll_update(bool touched, uint16_t abs_x, uint16_t abs_y,
 		if ((pct) > 0 && (cond)) { \
 			float s = (float)(num) / (float)(denom); \
 			sv *= s; sh *= s; \
-			if (invert) { sv = -sv; sh = -sh; } \
+			if (IS_ENABLED(invert)) { sv = -sv; sh = -sh; } \
 		} \
 	} while (0)
 
@@ -90,4 +93,9 @@ bool tps43_edgescroll_update(bool touched, uint16_t abs_x, uint16_t abs_y,
 	if (hwheel) *hwheel = (int)sh;
 
 	return true;
+#else
+	if (wheel)  *wheel = 0;
+	if (hwheel) *hwheel = 0;
+	return false;
+#endif
 }

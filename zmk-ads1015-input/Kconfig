@@ -87,7 +87,6 @@ config ZMK_TPS43_INPUT_DRAGLOCK_TIMEOUT_MS
 	int "Drag lock re-touch window (ms)"
 	default 300
 	range 50 1000
-	depends on ZMK_TPS43_INPUT_DRAGLOCK_ENABLE
 
 config ZMK_TPS43_INPUT_TAP_MOVE_THRESH
 	int "Tap movement threshold (abs counts)"
