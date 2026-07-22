@@ -1,0 +1,14 @@
+description: |
+  Azoteq TPS43 capacitive touchpad on I2C.
+  Emits INPUT_REL_X / INPUT_REL_Y for pointer movement,
+  INPUT_BTN_TOUCH for touch state, and handles tap/drag/scroll
+  via the integrated soft-tap FSM and edge-scroll engine.
+compatible: "zmk,tps43-input"
+include: [i2c-device.yaml]
+properties:
+  label:
+    type: string
+    required: true
+  update-interval-ms:
+    type: int
+    default: 5

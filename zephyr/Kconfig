@@ -1,0 +1,2 @@
+source "${ZEPHYR_BASE}/../zmk-ads1015-input/Kconfig"
+source "${ZEPHYR_BASE}/../zmk-tps43-input/Kconfig"
