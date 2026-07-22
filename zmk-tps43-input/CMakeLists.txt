@@ -1,0 +1,6 @@
+if(CONFIG_ZMK_TPS43_INPUT)
+  zephyr_library()
+  zephyr_library_sources(src/tps43_input.c)
+  zephyr_library_sources(src/tps43_tapdrag.c)
+  zephyr_library_sources(src/tps43_edgescroll.c)
+endif()

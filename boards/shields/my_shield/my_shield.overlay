@@ -54,6 +54,14 @@
         update-interval-ms = <3>;
         status = "okay";
     };
+
+    tps43: tps43-input@74 {
+        compatible = "zmk,tps43-input";
+        reg = <0x74>;
+        label = "TPS43";
+        update-interval-ms = <5>;
+        status = "okay";
+    };
 };
 
 #define HID_IO_USAGE_FWD_TO_JOYSTICK 2
@@ -80,5 +88,10 @@
         compatible = "zmk,input-behavior-listener";
         device = <&hidiokp>;
         input-processors = <&zip_fwd_to_joystick>;
+    };
+
+    tps43_mouse_il {
+        compatible = "zmk,input-listener";
+        device = <&tps43>;
     };
 };

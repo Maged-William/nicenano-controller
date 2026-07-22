@@ -1,0 +1,217 @@
+menuconfig ZMK_TPS43_INPUT
+	bool "TPS43 touchpad input driver"
+	depends on I2C
+	default n
+	help
+	  Azoteq TPS43 capacitive touchpad on I2C (addr 0x74).
+	  Provides pointer movement, tap-to-click, drag, double-click,
+	  and 1-finger edge scroll.
+
+if ZMK_TPS43_INPUT
+
+config ZMK_TPS43_INPUT_INTERVAL_MS
+	int "Poll interval (ms)"
+	default 5
+	range 3 100
+	help
+	  5ms = 200 Hz. Lower = smoother but more CPU.
+
+config ZMK_TPS43_INPUT_SENSITIVITY_NUM
+	int "Pointer sensitivity numerator"
+	default 1
+	range 1 100
+
+config ZMK_TPS43_INPUT_SENSITIVITY_DENOM
+	int "Pointer sensitivity denominator"
+	default 2
+	range 1 100
+
+config ZMK_TPS43_INPUT_SCROLL_SENS_NUM
+	int "Scroll sensitivity numerator"
+	default 2
+	range 1 100
+
+config ZMK_TPS43_INPUT_SCROLL_SENS_DENOM
+	int "Scroll sensitivity denominator"
+	default 1
+	range 1 100
+
+config ZMK_TPS43_INPUT_INVERT_X
+	bool "Invert X axis"
+	default n
+
+config ZMK_TPS43_INPUT_INVERT_Y
+	bool "Invert Y axis"
+	default n
+
+menuconfig ZMK_TPS43_INPUT_TAPDRAG
+	bool "Soft-tap FSM (tap, drag, double-click)"
+	default y
+	help
+	  Pure-software tap FSM ported from libinput. Replaces
+	  the hardware gesture engine (SFGestureEnable=0 on init).
+
+if ZMK_TPS43_INPUT_TAPDRAG
+
+config ZMK_TPS43_INPUT_TAP_TIMEOUT_MS
+	int "Tap detection timeout (ms)"
+	default 180
+	range 50 500
+
+config ZMK_TPS43_INPUT_DOUBLE_CLICK_TIMEOUT_MS
+	int "Double-click re-touch window (ms)"
+	default 250
+	range 50 500
+
+config ZMK_TPS43_INPUT_DRAGLOCK_ENABLE
+	bool "Enable drag lock"
+	default n
+
+config ZMK_TPS43_INPUT_DRAGLOCK_TIMEOUT_MS
+	int "Drag lock re-touch window (ms)"
+	default 300
+	range 50 1000
+	depends on ZMK_TPS43_INPUT_DRAGLOCK_ENABLE
+
+config ZMK_TPS43_INPUT_TAP_MOVE_THRESH
+	int "Tap movement threshold (abs counts)"
+	default 30
+	range 5 500
+
+config ZMK_TPS43_INPUT_SAME_SPOT_THRESH
+	int "Re-touch same-spot threshold (abs counts)"
+	default 80
+	range 5 500
+
+config ZMK_TPS43_INPUT_DROP_GRACE_MS
+	int "Drop grace period (ms)"
+	default 20
+	range 0 200
+
+endif
+
+menuconfig ZMK_TPS43_INPUT_EDGESCROLL
+	bool "1-finger edge scroll"
+	default n
+	help
+	  Scroll by touching an edge zone. Up to 4 configurable
+	  edges (L/R/T/B) with per-edge axis, speed, invert.
+
+if ZMK_TPS43_INPUT_EDGESCROLL
+
+config ZMK_TPS43_INPUT_ABS_MAX_X
+	int "Touchpad absolute X max"
+	default 1024
+	range 1 65535
+
+config ZMK_TPS43_INPUT_ABS_MAX_Y
+	int "Touchpad absolute Y max"
+	default 1024
+	range 1 65535
+
+config ZMK_TPS43_INPUT_EDGE_LEFT_PCT
+	int "Left edge zone width (%)"
+	default 0
+	range 0 50
+
+config ZMK_TPS43_INPUT_EDGE_LEFT_AXIS
+	int "Left edge axis (0=Y scroll, 1=X scroll)"
+	default 1
+	range 0 1
+
+config ZMK_TPS43_INPUT_EDGE_LEFT_SPEED_NUM
+	int "Left edge speed numerator"
+	default 1
+	range 1 100
+
+config ZMK_TPS43_INPUT_EDGE_LEFT_SPEED_DENOM
+	int "Left edge speed denominator"
+	default 10
+	range 1 100
+
+config ZMK_TPS43_INPUT_EDGE_LEFT_INVERT
+	bool "Left edge invert"
+	default n
+
+config ZMK_TPS43_INPUT_EDGE_RIGHT_PCT
+	int "Right edge zone width (%)"
+	default 15
+	range 0 50
+
+config ZMK_TPS43_INPUT_EDGE_RIGHT_AXIS
+	int "Right edge axis (0=Y scroll, 1=X scroll)"
+	default 0
+	range 0 1
+
+config ZMK_TPS43_INPUT_EDGE_RIGHT_SPEED_NUM
+	int "Right edge speed numerator"
+	default 1
+	range 1 100
+
+config ZMK_TPS43_INPUT_EDGE_RIGHT_SPEED_DENOM
+	int "Right edge speed denominator"
+	default 10
+	range 1 100
+
+config ZMK_TPS43_INPUT_EDGE_RIGHT_INVERT
+	bool "Right edge invert"
+	default n
+
+config ZMK_TPS43_INPUT_EDGE_TOP_PCT
+	int "Top edge zone height (%)"
+	default 0
+	range 0 50
+
+config ZMK_TPS43_INPUT_EDGE_TOP_AXIS
+	int "Top edge axis (0=Y scroll, 1=X scroll)"
+	default 1
+	range 0 1
+
+config ZMK_TPS43_INPUT_EDGE_TOP_SPEED_NUM
+	int "Top edge speed numerator"
+	default 1
+	range 1 100
+
+config ZMK_TPS43_INPUT_EDGE_TOP_SPEED_DENOM
+	int "Top edge speed denominator"
+	default 10
+	range 1 100
+
+config ZMK_TPS43_INPUT_EDGE_TOP_INVERT
+	bool "Top edge invert"
+	default n
+
+config ZMK_TPS43_INPUT_EDGE_BOTTOM_PCT
+	int "Bottom edge zone height (%)"
+	default 15
+	range 0 50
+
+config ZMK_TPS43_INPUT_EDGE_BOTTOM_AXIS
+	int "Bottom edge axis (0=Y scroll, 1=X scroll)"
+	default 1
+	range 0 1
+
+config ZMK_TPS43_INPUT_EDGE_BOTTOM_SPEED_NUM
+	int "Bottom edge speed numerator"
+	default 1
+	range 1 100
+
+config ZMK_TPS43_INPUT_EDGE_BOTTOM_SPEED_DENOM
+	int "Bottom edge speed denominator"
+	default 10
+	range 1 100
+
+config ZMK_TPS43_INPUT_EDGE_BOTTOM_INVERT
+	bool "Bottom edge invert"
+	default n
+
+endif
+
+config ZMK_TPS43_INPUT_LOG_LEVEL
+	int "Log level"
+	default 3
+	range 0 4
+	help
+	  0=OFF, 1=ERR, 2=WRN, 3=INF, 4=DBG.
+
+endif
