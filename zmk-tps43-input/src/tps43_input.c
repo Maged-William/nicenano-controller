@@ -25,6 +25,8 @@ struct tps43_input_data {
 	uint8_t regs[16];
 	bool found;
 	bool prev_button_down;
+	uint16_t last_abs_x;
+	uint16_t last_abs_y;
 };
 
 static int tps43_end_comm(const struct device *i2c, uint16_t addr)
@@ -109,7 +111,13 @@ static void tps43_poll_handler(struct k_work *work)
 	uint8_t finger_count = data->regs[TPS43_FINGER_COUNT - TPS43_GESTURE0];
 	bool touched = finger_count > 0;
 
-	input_report(dev, INPUT_EV_KEY, INPUT_BTN_TOUCH, touched ? 1 : 0, false, K_NO_WAIT);
+	if (touched) {
+		data->last_abs_x = abs_x;
+		data->last_abs_y = abs_y;
+	}
+
+	uint16_t fsm_abs_x = touched ? abs_x : data->last_abs_x;
+	uint16_t fsm_abs_y = touched ? abs_y : data->last_abs_y;
 
 #if CONFIG_ZMK_TPS43_INPUT_EDGESCROLL
 	int edge_wheel = 0, edge_hwheel = 0;
@@ -123,7 +131,7 @@ static void tps43_poll_handler(struct k_work *work)
 	{
 		bool rc = false, dc = false;
 		uint8_t fg = touched ? finger_count : 0;
-		bool left_down = tps43_tapdrag_update(touched, fg, abs_x, abs_y,
+		bool left_down = tps43_tapdrag_update(touched, fg, fsm_abs_x, fsm_abs_y,
 		                                      k_uptime_get(), &rc, &dc);
 
 		if (left_down != data->prev_button_down) {
@@ -190,6 +198,8 @@ static int tps43_input_init(const struct device *dev)
 	data->dev = dev;
 	data->found = false;
 	data->prev_button_down = false;
+	data->last_abs_x = 0;
+	data->last_abs_y = 0;
 
 	if (!device_is_ready(cfg->i2c_bus)) {
 		LOG_ERR("I2C bus not ready");
