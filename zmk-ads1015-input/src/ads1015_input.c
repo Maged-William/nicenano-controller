@@ -103,8 +103,8 @@ static void ads1015_poll_handler(struct k_work *work)
         data->calibrated = true;
         LOG_INF("ADS1015 center: X=%d Y=%d", data->center_x, data->center_y);
     } else {
-        data->smooth_x = (data->smooth_x * 7 + x) / 8;
-        data->smooth_y = (data->smooth_y * 7 + y) / 8;
+        data->smooth_x = (data->smooth_x * 3 + x) / 4;
+        data->smooth_y = (data->smooth_y * 3 + y) / 4;
     }
 
     int16_t dx_raw = (int16_t)(data->smooth_x - data->center_x);
@@ -113,8 +113,8 @@ static void ads1015_poll_handler(struct k_work *work)
     int8_t target_x = CLAMP(dx_raw / 100, -127, 127);
     int8_t target_y = CLAMP(dy_raw / 100, -127, 127);
 
-    if (target_x > -8 && target_x < 8) target_x = 0;
-    if (target_y > -8 && target_y < 8) target_y = 0;
+    if (target_x > -4 && target_x < 4) target_x = 0;
+    if (target_y > -4 && target_y < 4) target_y = 0;
 
     input_report(data->dev, INPUT_EV_ABS, INPUT_ABS_X, target_x, false, K_NO_WAIT);
     input_report(data->dev, INPUT_EV_ABS, INPUT_ABS_Y, target_y, true, K_NO_WAIT);
