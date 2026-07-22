@@ -1,2 +1,0 @@
-source "zmk-ads1015-input/Kconfig"
-source "zmk-hid-io/Kconfig"

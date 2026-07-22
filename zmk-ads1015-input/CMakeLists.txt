@@ -2,3 +2,23 @@ if(CONFIG_ZMK_ADS1015_INPUT)
   zephyr_library()
   zephyr_library_sources(src/ads1015_input.c)
 endif()
+
+if ((NOT CONFIG_ZMK_SPLIT) OR CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+  zephyr_library_sources_ifdef(CONFIG_ZMK_BEHAVIOR_HID_IO_KEY_PRESS ../zmk-hid-io/src/behaviors/behavior_hid_io_key_press.c)
+  zephyr_library_sources_ifdef(CONFIG_ZMK_INPUT_BEHAVIOR_FWD_TO_HID_IO ../zmk-hid-io/src/behaviors/input_behavior_fwd_to_hid_io.c)
+  zephyr_library_sources_ifdef(CONFIG_ZMK_INPUT_PROCESSOR_FWD_TO_HID_IO ../zmk-hid-io/src/behaviors/input_processor_fwd_to_hid_io.c)
+  zephyr_library_sources_ifdef(CONFIG_ZMK_HID_IO ../zmk-hid-io/src/hid-io/hid_io.c)
+  zephyr_library_sources_ifdef(CONFIG_ZMK_HID_IO ../zmk-hid-io/src/hid-io/endpoints.c)
+  zephyr_library_sources_ifdef(CONFIG_ZMK_HID_IO ../zmk-hid-io/src/hid-io/hid_joystick.c)
+  zephyr_library_sources_ifdef(CONFIG_ZMK_HID_IO ../zmk-hid-io/src/hid-io/hid_mouse.c)
+  zephyr_library_sources_ifdef(CONFIG_ZMK_HID_IO ../zmk-hid-io/src/hid-io/hid_output.c)
+  zephyr_library_sources_ifdef(CONFIG_ZMK_HID_IO ../zmk-hid-io/src/hid-io/hid_volume_knob.c)
+
+  if (CONFIG_ZMK_BLE)
+    zephyr_library_sources_ifdef(CONFIG_ZMK_HID_IO ../zmk-hid-io/src/hid-io/hog.c)
+  endif()
+
+  zephyr_library_sources_ifdef(CONFIG_ZMK_HID_IO ../zmk-hid-io/src/hid-io/usb_hid.c)
+
+  zephyr_include_directories(../zmk-hid-io/include)
+endif()

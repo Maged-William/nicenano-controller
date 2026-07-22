@@ -1,8 +1,6 @@
 build:
-  cmake: .
-  kconfig: Kconfig
+  cmake: zmk-ads1015-input
+  kconfig: zmk-ads1015-input/Kconfig
   settings:
     board_root: .
-    dts_root:
-      - zmk-ads1015-input
-      - zmk-hid-io
+    dts_root: zmk-ads1015-input
